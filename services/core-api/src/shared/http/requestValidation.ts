@@ -83,7 +83,18 @@ export const healthStatus = (value: unknown): ServiceRecord["healthStatus"] | un
 };
 
 export const serviceType = (value: unknown): ServiceType | undefined => {
-  if (value === "api" || value === "frontend" || value === "worker" || value === "db" || value === "queue") return value;
+  if (
+    value === "api" ||
+    value === "frontend" ||
+    value === "worker" ||
+    value === "database" ||
+    value === "db" ||
+    value === "queue" ||
+    value === "cache" ||
+    value === "external"
+  ) {
+    return value;
+  }
   return undefined;
 };
 

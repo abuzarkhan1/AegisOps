@@ -16,6 +16,8 @@ const acceptDeployment = async (provider: "github" | "gitlab", body: Record<stri
     environment: typeof body.environment === "string" ? body.environment : "development",
     version: typeof body.version === "string" ? body.version : undefined,
     commitSha: typeof body.commitSha === "string" ? body.commitSha : typeof body.after === "string" ? body.after : undefined,
+    branch: typeof body.branch === "string" ? body.branch : typeof body.ref === "string" ? body.ref.replace(/^refs\/heads\//, "") : undefined,
+    status: typeof body.status === "string" ? body.status : "completed",
     deployedBy: typeof body.deployedBy === "string" ? body.deployedBy : undefined,
     repository: typeof body.repository === "string" ? body.repository : undefined,
     metadata: body

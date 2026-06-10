@@ -903,6 +903,9 @@ export class PlatformRepository {
         COUNT(*) FILTER (WHERE status <> 'resolved')::int AS "openIncidents",
         COUNT(*) FILTER (WHERE severity = 'critical')::int AS "criticalIncidents",
         (SELECT COUNT(*)::int FROM services WHERE ($1::uuid IS NULL OR organization_id = $1)) AS "servicesMonitored",
+        (SELECT COUNT(*)::int FROM services WHERE health_status = 'healthy' AND ($1::uuid IS NULL OR organization_id = $1)) AS "healthyServices",
+        (SELECT COUNT(*)::int FROM services WHERE health_status = 'degraded' AND ($1::uuid IS NULL OR organization_id = $1)) AS "degradedServices",
+        (SELECT COUNT(*)::int FROM services WHERE health_status = 'down' AND ($1::uuid IS NULL OR organization_id = $1)) AS "downServices",
         (SELECT COUNT(*)::int FROM alert_rules WHERE enabled = true AND ($1::uuid IS NULL OR organization_id = $1)) AS "alertRulesEnabled"
       FROM incidents
       WHERE ($1::uuid IS NULL OR organization_id = $1)

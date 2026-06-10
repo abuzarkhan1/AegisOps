@@ -95,7 +95,7 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'services_service_type_check') THEN
-    ALTER TABLE services ADD CONSTRAINT services_service_type_check CHECK (service_type IN ('api', 'frontend', 'worker', 'db', 'queue'));
+    ALTER TABLE services ADD CONSTRAINT services_service_type_check CHECK (service_type IN ('api', 'frontend', 'worker', 'database', 'db', 'queue', 'cache', 'external'));
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'api_keys_status_check') THEN

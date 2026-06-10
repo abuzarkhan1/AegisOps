@@ -183,7 +183,7 @@ export function IncidentsPage() {
               </div>
             </div>
 
-            {/* Metrics Trend Simulation placeholder */}
+            {/* Metrics snapshot */}
             <div>
               <h3 className="text-sm font-bold uppercase text-slate-400 mb-2">Metrics Snapshot during alert</h3>
               <div className="grid gap-4 sm:grid-cols-2">

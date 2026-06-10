@@ -3,12 +3,15 @@ import {
   BrainCircuit,
   Gauge,
   GitBranch,
+  FolderKanban,
   LayoutDashboard,
   ListTree,
   Settings,
   Siren,
   TerminalSquare,
-  BarChart3
+  BarChart3,
+  ActivitySquare,
+  UsersRound
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -19,7 +22,9 @@ export type NavigationItem = {
 
 export const navigationItems: NavigationItem[] = [
   { label: "Overview", icon: LayoutDashboard },
+  { label: "Projects", icon: FolderKanban },
   { label: "Services", icon: ListTree },
+  { label: "Alert Rules", icon: ActivitySquare },
   { label: "Incidents", icon: Siren },
   { label: "Logs", icon: TerminalSquare },
   { label: "Metrics", icon: Gauge },
@@ -27,5 +32,6 @@ export const navigationItems: NavigationItem[] = [
   { label: "Reports", icon: BarChart3 },
   { label: "AI RCA", icon: BrainCircuit },
   { label: "Notifications", icon: BellRing },
+  { label: "Team", icon: UsersRound },
   { label: "Settings", icon: Settings }
 ];

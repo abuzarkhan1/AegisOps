@@ -63,11 +63,15 @@ export const openApiSpec = {
     "/incidents/{incidentId}/assign": { post: { tags: ["Incidents"], summary: "Assign incident" } },
     "/incidents/{incidentId}/resolve": { post: { tags: ["Incidents"], summary: "Resolve incident" } },
     "/incidents/{incidentId}/timeline": { get: { tags: ["Incidents"], summary: "List incident timeline" } },
-    "/incidents/{incidentId}/ai-analysis": { get: { tags: ["Incidents"], summary: "List incident AI analysis" } },
+    "/incidents/{incidentId}/ai-analysis": {
+      get: { tags: ["Incidents"], summary: "List incident AI analysis" },
+      post: { tags: ["Incidents"], summary: "Persist generated incident AI analysis" }
+    },
     "/alert-rules": {
       get: { tags: ["Alert Rules"], summary: "List alert rules" },
       post: { tags: ["Alert Rules"], summary: "Create alert rule" }
     },
+    "/alert-rules/evaluate": { post: { tags: ["Alert Rules"], summary: "Evaluate enabled alert rules against a metrics or health snapshot" } },
     "/alert-rules/{ruleId}": {
       patch: { tags: ["Alert Rules"], summary: "Update alert rule" },
       delete: { tags: ["Alert Rules"], summary: "Delete alert rule" }
@@ -76,6 +80,7 @@ export const openApiSpec = {
     "/dashboard/service-health": { get: { tags: ["Dashboard"], summary: "Service health summary" } },
     "/dashboard/recent-incidents": { get: { tags: ["Dashboard"], summary: "Recent incidents" } },
     "/dashboard/error-trends": { get: { tags: ["Dashboard"], summary: "Error trend buckets" } },
+    "/logs": { get: { tags: ["Logs"], summary: "Search PostgreSQL-backed ingested logs" } },
     "/audit-logs": { get: { tags: ["Audit"], summary: "List audit logs" } },
     "/health": { get: { tags: ["System"], summary: "Service health" } },
     "/openapi.json": { get: { tags: ["System"], summary: "OpenAPI document" } }

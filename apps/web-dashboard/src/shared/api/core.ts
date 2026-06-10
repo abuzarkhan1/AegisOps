@@ -2,7 +2,10 @@ import { coreApiUrl, gatewayUrl } from "../../app/config";
 
 export type ServiceRecord = {
   id: string;
+  organizationId?: string;
+  projectId?: string;
   name: string;
+  serviceType?: string;
   language?: string;
   repositoryUrl?: string;
   healthStatus: string;
@@ -22,7 +25,38 @@ export type OrganizationRecord = {
   id: string;
   name: string;
   slug: string;
+  plan?: string;
   createdAt: string;
+};
+
+export type ProjectRecord = {
+  id: string;
+  organizationId: string;
+  name: string;
+  environment: string;
+  description?: string;
+  createdAt: string;
+};
+
+export type AlertRuleRecord = {
+  id: string;
+  organizationId: string;
+  serviceId?: string;
+  name: string;
+  metric: string;
+  operator: string;
+  threshold: number;
+  durationSeconds: number;
+  severity: string;
+  enabled: boolean;
+};
+
+export type TeamMemberRecord = {
+  id: string;
+  email: string;
+  name: string;
+  memberRole: string;
+  invitedAt: string;
 };
 
 export type DeploymentRecord = {
@@ -32,7 +66,12 @@ export type DeploymentRecord = {
   environment: string;
   version?: string;
   commitSha?: string;
+  branch?: string;
+  status?: string;
   deployedBy?: string;
+  repository?: string;
+  timestamp?: string;
+  receivedAt?: string;
   createdAt: string;
 };
 
@@ -76,6 +115,75 @@ export async function fetchOrganizations() {
   return data.organizations;
 }
 
+export async function fetchProjects(params?: Record<string, string>) {
+  const query = new URLSearchParams(params ?? {}).toString();
+  const data = await request<{ projects: ProjectRecord[] }>(`${coreApiUrl}/api/projects${query ? `?${query}` : ""}`);
+  return data.projects;
+}
+
+export async function createProject(payload: Record<string, unknown>) {
+  return request<{ project: ProjectRecord }>(`${coreApiUrl}/api/projects`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function createService(projectId: string, payload: Record<string, unknown>) {
+  return request<{ service: ServiceRecord }>(`${coreApiUrl}/api/projects/${projectId}/services`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function createApiKey(serviceId: string, name: string) {
+  return request<{ apiKey: { id: string; rawKey: string; prefix: string } }>(`${coreApiUrl}/api/services/${serviceId}/api-keys`, {
+    method: "POST",
+    body: JSON.stringify({ name })
+  });
+}
+
+export async function fetchTeamMembers(orgId: string) {
+  const data = await request<{ users: TeamMemberRecord[] }>(`${coreApiUrl}/api/organizations/${orgId}/users`);
+  return data.users;
+}
+
+export async function inviteTeamMember(orgId: string, payload: Record<string, unknown>) {
+  return request<Record<string, unknown>>(`${coreApiUrl}/api/organizations/${orgId}/users/invite`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function fetchAlertRules(params?: Record<string, string>) {
+  const query = new URLSearchParams(params ?? {}).toString();
+  const data = await request<{ alertRules: AlertRuleRecord[] }>(`${coreApiUrl}/api/alert-rules${query ? `?${query}` : ""}`);
+  return data.alertRules;
+}
+
+export async function createAlertRule(payload: Record<string, unknown>) {
+  return request<{ alertRule: AlertRuleRecord }>(`${coreApiUrl}/api/alert-rules`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function evaluateAlertRules(payload: Record<string, unknown>) {
+  return request<{ evaluated: number; breached: number; results: any[] }>(`${coreApiUrl}/api/alert-rules/evaluate`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function fetchDashboardSummary() {
+  const data = await request<{ summary: Record<string, number> }>(`${coreApiUrl}/api/dashboard/summary`);
+  return data.summary;
+}
+
+export async function fetchErrorTrends(hours = 24) {
+  const data = await request<{ buckets: Array<Record<string, number | string>> }>(`${coreApiUrl}/api/dashboard/error-trends?hours=${hours}`);
+  return data.buckets;
+}
+
 export async function ingestLog(apiKey: string, payload: Record<string, unknown>) {
   return request<{ status: string; topic: string }>(`${gatewayUrl}/ingest/logs`, {
     method: "POST",
@@ -94,7 +202,10 @@ export async function ingestMetric(apiKey: string, payload: Record<string, unkno
 
 export async function fetchDeployments() {
   const data = await request<{ deployments: DeploymentRecord[] }>(`${gatewayUrl}/deployments`);
-  return data.deployments;
+  return data.deployments.map((deployment: any) => ({
+    ...deployment,
+    createdAt: deployment.createdAt ?? deployment.receivedAt ?? deployment.timestamp ?? new Date().toISOString()
+  }));
 }
 
 export async function createDeployment(provider: "github" | "gitlab", payload: Record<string, unknown>) {

@@ -13,6 +13,8 @@ export type DeploymentRecord = {
   environment: string;
   version?: string;
   commitSha?: string;
+  branch?: string;
+  status?: string;
   deployedBy?: string;
   repository?: string;
   timestamp: string;
@@ -39,6 +41,8 @@ const normalizeDeployment = (row: any): DeploymentRecord => {
     environment: row.environment,
     version: row.version ?? undefined,
     commitSha: row.commitSha ?? undefined,
+    branch: row.branch ?? undefined,
+    status: row.status ?? undefined,
     deployedBy: row.deployedBy ?? undefined,
     repository: row.repository ?? undefined,
     timestamp: toIso(row.timestamp) ?? new Date().toISOString(),
@@ -64,12 +68,16 @@ export class DeploymentRepository {
         environment,
         version,
         commit_sha,
+        commit_hash,
+        branch,
+        status,
         author,
         repository_url,
+        repository,
         metadata,
         deployed_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10, $11, $12, $12, $13, $14)
       RETURNING
         id,
         provider,
@@ -78,9 +86,11 @@ export class DeploymentRepository {
         service_id AS "serviceId",
         environment,
         version,
-        commit_sha AS "commitSha",
+        COALESCE(commit_hash, commit_sha) AS "commitSha",
+        branch,
+        status,
         author AS "deployedBy",
-        repository_url AS "repository",
+        COALESCE(repository, repository_url) AS "repository",
         metadata,
         deployed_at AS "timestamp",
         created_at AS "receivedAt"
@@ -94,6 +104,8 @@ export class DeploymentRepository {
         payload.environment ?? "development",
         payload.version ?? null,
         payload.commitSha ?? null,
+        payload.branch ?? null,
+        payload.status ?? "completed",
         payload.deployedBy ?? null,
         payload.repository ?? null,
         JSON.stringify(metadata),
@@ -114,9 +126,11 @@ export class DeploymentRepository {
         service_id AS "serviceId",
         environment,
         version,
-        commit_sha AS "commitSha",
+        COALESCE(commit_hash, commit_sha) AS "commitSha",
+        branch,
+        status,
         author AS "deployedBy",
-        repository_url AS "repository",
+        COALESCE(repository, repository_url) AS "repository",
         metadata,
         deployed_at AS "timestamp",
         created_at AS "receivedAt"
@@ -139,9 +153,11 @@ export class DeploymentRepository {
         service_id AS "serviceId",
         environment,
         version,
-        commit_sha AS "commitSha",
+        COALESCE(commit_hash, commit_sha) AS "commitSha",
+        branch,
+        status,
         author AS "deployedBy",
-        repository_url AS "repository",
+        COALESCE(repository, repository_url) AS "repository",
         metadata,
         deployed_at AS "timestamp",
         created_at AS "receivedAt"
@@ -196,4 +212,3 @@ export class DeploymentRepository {
 }
 
 export const deploymentRepository = new DeploymentRepository();
-

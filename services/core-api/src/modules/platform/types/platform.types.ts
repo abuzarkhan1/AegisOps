@@ -4,7 +4,7 @@ export type IncidentSeverity = "low" | "medium" | "high" | "critical";
 export type IncidentStatus = "open" | "investigating" | "identified" | "monitoring" | "resolved";
 export type AlertOperator = "gt" | "lt" | "gte" | "lte" | "eq";
 export type ApiKeyStatus = "active" | "revoked";
-export type ServiceType = "api" | "frontend" | "worker" | "db" | "queue";
+export type ServiceType = "api" | "frontend" | "worker" | "database" | "db" | "queue" | "cache" | "external";
 
 export type User = {
   id: string;

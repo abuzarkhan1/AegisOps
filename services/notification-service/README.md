@@ -1,6 +1,6 @@
 # Notification Service
 
-Java Spring Boot service for future notification and escalation workflows.
+Java Spring Boot service for notification and escalation workflows.
 
 Current foundation endpoints:
 
@@ -8,6 +8,12 @@ Current foundation endpoints:
 - `GET /actuator/health`
 - `GET /actuator/prometheus`
 - `POST /notifications/test`
+- `GET /notify/settings/:orgId`
+- `PATCH /notify/settings/:orgId`
+- `GET /notify/history`
+- `POST /notify/email`
+- `POST /notify/slack`
+- `POST /notify/discord`
+- `/notify/escalation-policies`
 
-RabbitMQ, PostgreSQL, and Redis configuration is surfaced as placeholder wiring for the next implementation phase.
-
+The service consumes RabbitMQ notification and escalation queues, stores local notification settings/history, supports email, Slack, and Discord mock providers for local development, and exposes actuator health/Prometheus metrics.

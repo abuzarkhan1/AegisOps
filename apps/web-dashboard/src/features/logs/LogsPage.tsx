@@ -17,6 +17,10 @@ export function LogsPage() {
   const [levelFilter, setLevelFilter] = useState("");
   const [envFilter, setEnvFilter] = useState("");
   const [traceFilter, setTraceFilter] = useState("");
+  const [routeFilter, setRouteFilter] = useState("");
+  const [statusCodeFilter, setStatusCodeFilter] = useState("");
+  const [fromFilter, setFromFilter] = useState("");
+  const [toFilter, setToFilter] = useState("");
   const [searchFilter, setSearchFilter] = useState("");
   const [limit, setLimit] = useState(100);
   const [loading, setLoading] = useState(false);
@@ -34,6 +38,10 @@ export function LogsPage() {
         level: levelFilter,
         environment: envFilter,
         traceId: traceFilter,
+        route: routeFilter,
+        statusCode: statusCodeFilter,
+        from: fromFilter ? new Date(fromFilter).toISOString() : "",
+        to: toFilter ? new Date(toFilter).toISOString() : "",
         search: searchFilter,
         limit
       });
@@ -70,7 +78,7 @@ export function LogsPage() {
         </div>
 
         {/* Filters Panel */}
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5">
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-slate-400">Service</label>
             <select
@@ -126,6 +134,50 @@ export function LogsPage() {
               onChange={(e) => setTraceFilter(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && loadLogs()}
               className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-200 outline-none placeholder:text-slate-500"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-400">Route</label>
+            <input
+              type="text"
+              placeholder="/api/checkout"
+              value={routeFilter}
+              onChange={(e) => setRouteFilter(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && loadLogs()}
+              className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-200 outline-none placeholder:text-slate-500"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-400">Status</label>
+            <input
+              type="number"
+              placeholder="500"
+              value={statusCodeFilter}
+              onChange={(e) => setStatusCodeFilter(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && loadLogs()}
+              className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-200 outline-none placeholder:text-slate-500"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-400">From</label>
+            <input
+              type="datetime-local"
+              value={fromFilter}
+              onChange={(e) => setFromFilter(e.target.value)}
+              className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-200 outline-none"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-400">To</label>
+            <input
+              type="datetime-local"
+              value={toFilter}
+              onChange={(e) => setToFilter(e.target.value)}
+              className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-200 outline-none"
             />
           </div>
 

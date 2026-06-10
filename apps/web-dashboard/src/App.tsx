@@ -8,9 +8,12 @@ import { LogsPage } from "./features/logs/LogsPage";
 import { MetricsPage } from "./features/metrics/MetricsPage";
 import { NotificationsPage } from "./features/notifications/NotificationsPage";
 import { OverviewPage } from "./features/overview/OverviewPage";
+import { ProjectsPage } from "./features/projects/ProjectsPage";
+import { AlertRulesPage } from "./features/alerts/AlertRulesPage";
 import { ServicesPage } from "./features/services/ServicesPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ReportsPage } from "./features/reports/ReportsPage";
+import { TeamMembersPage } from "./features/team/TeamMembersPage";
 import { ShellLayout } from "./layouts/ShellLayout";
 import { fetchHealthTarget } from "./shared/api/health";
 import type { HealthResult, HealthState } from "./shared/api/health";
@@ -52,7 +55,9 @@ function App() {
   return (
     <ShellLayout activeNav={activeNav} onNavChange={setActiveNav} status={shellStatus}>
       {activeNav === "Overview" ? <OverviewPage health={health} /> : null}
+      {activeNav === "Projects" ? <ProjectsPage /> : null}
       {activeNav === "Services" ? <ServicesPage /> : null}
+      {activeNav === "Alert Rules" ? <AlertRulesPage /> : null}
       {activeNav === "Incidents" ? <IncidentsPage /> : null}
       {activeNav === "Logs" ? <LogsPage /> : null}
       {activeNav === "Metrics" ? <MetricsPage /> : null}
@@ -60,6 +65,7 @@ function App() {
       {activeNav === "Reports" ? <ReportsPage /> : null}
       {activeNav === "AI RCA" ? <AiRcaPage /> : null}
       {activeNav === "Notifications" ? <NotificationsPage /> : null}
+      {activeNav === "Team" ? <TeamMembersPage /> : null}
       {activeNav === "Settings" ? <SettingsPage /> : null}
     </ShellLayout>
   );
