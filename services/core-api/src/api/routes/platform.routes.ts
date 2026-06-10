@@ -10,6 +10,7 @@ import { projectRouter } from "../../modules/projects/project.routes";
 import { serviceRouter } from "../../modules/services/service.routes";
 import { systemRouter } from "../../modules/system/system.routes";
 import { logsRouter } from "../../modules/system/logs.routes";
+import { telemetryRouter } from "../../modules/system/telemetry.routes";
 
 export const platformRouter = Router();
 
@@ -24,3 +25,4 @@ platformRouter.use("/api/dashboard", dashboardRouter);
 platformRouter.use("/api/audit-logs", auditLogRouter);
 platformRouter.use("/api", systemRouter);
 platformRouter.use("/api", logsRouter);
+platformRouter.use("/api", telemetryRouter);

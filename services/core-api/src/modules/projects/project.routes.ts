@@ -20,10 +20,9 @@ projectRouter.get(
         res.json({ projects: cached });
         return;
       }
-      const projects = await platformRepository.listProjects(env);
-      const orgProjects = projects.filter((p) => p.organizationId === orgId);
-      await cache.set(cacheKey, orgProjects, 300); // 5 mins TTL
-      res.json({ projects: orgProjects });
+      const projects = await platformRepository.listProjects(env, orgId);
+      await cache.set(cacheKey, projects, 300); // 5 mins TTL
+      res.json({ projects });
       return;
     }
 
@@ -37,6 +36,7 @@ projectRouter.post(
     const project = await platformRepository.createProject({
       organizationId,
       name: requiredString(req.body, "name"),
+      projectKey: optionalString(req.body, "projectKey"),
       environment: optionalString(req.body, "environment"),
       description: optionalString(req.body, "description")
     });
@@ -69,6 +69,7 @@ projectRouter.patch(
   asyncHandler(async (req, res) => {
     const project = await platformRepository.updateProject(req.params.projectId, {
       name: optionalString(req.body, "name"),
+      projectKey: optionalString(req.body, "projectKey"),
       environment: optionalString(req.body, "environment"),
       description: optionalString(req.body, "description")
     });

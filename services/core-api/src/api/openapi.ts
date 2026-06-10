@@ -72,6 +72,7 @@ export const openApiSpec = {
       post: { tags: ["Alert Rules"], summary: "Create alert rule" }
     },
     "/alert-rules/evaluate": { post: { tags: ["Alert Rules"], summary: "Evaluate enabled alert rules against a metrics or health snapshot" } },
+    "/alert-rules/evaluate-log": { post: { tags: ["Alert Rules"], summary: "Evaluate enabled log alert rules against PostgreSQL-backed logs" } },
     "/alert-rules/{ruleId}": {
       patch: { tags: ["Alert Rules"], summary: "Update alert rule" },
       delete: { tags: ["Alert Rules"], summary: "Delete alert rule" }
@@ -81,6 +82,8 @@ export const openApiSpec = {
     "/dashboard/recent-incidents": { get: { tags: ["Dashboard"], summary: "Recent incidents" } },
     "/dashboard/error-trends": { get: { tags: ["Dashboard"], summary: "Error trend buckets" } },
     "/logs": { get: { tags: ["Logs"], summary: "Search PostgreSQL-backed ingested logs" } },
+    "/telemetry/metrics": { get: { tags: ["Telemetry"], summary: "Query PostgreSQL-backed raw metrics" } },
+    "/telemetry/metric-aggregates": { get: { tags: ["Telemetry"], summary: "Query PostgreSQL-backed metric aggregate buckets" } },
     "/audit-logs": { get: { tags: ["Audit"], summary: "List audit logs" } },
     "/health": { get: { tags: ["System"], summary: "Service health" } },
     "/openapi.json": { get: { tags: ["System"], summary: "OpenAPI document" } }

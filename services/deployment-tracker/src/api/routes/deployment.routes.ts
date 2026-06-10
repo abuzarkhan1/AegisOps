@@ -37,7 +37,16 @@ deploymentRouter.get("/health", asyncHandler(async (_req, res) => {
 
   res.json({
     status: degraded ? "degraded" : "ok",
+    healthStatus: degraded ? "degraded" : "healthy",
     service: env.SERVICE_NAME,
+    timestamp: new Date().toISOString(),
+    mode: "local",
+    dependencies: {
+      postgres: "healthy",
+      redis: "not_required",
+      kafka: checks.kafka.status === "ok" ? "healthy" : "degraded",
+      rabbitmq: env.RABBITMQ_URL ? "configured" : "not_required"
+    },
     publishes: ["deployments.created"],
     checks
   });

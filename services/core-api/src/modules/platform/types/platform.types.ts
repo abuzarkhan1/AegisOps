@@ -33,6 +33,7 @@ export type Organization = {
 export type Project = {
   id: string;
   organizationId: string;
+  projectKey: string;
   name: string;
   environment: string;
   description?: string;
@@ -46,6 +47,7 @@ export type ServiceRecord = {
   projectId: string;
   name: string;
   slug: string;
+  environment: string;
   serviceType: ServiceType;
   language?: string;
   repositoryUrl?: string;

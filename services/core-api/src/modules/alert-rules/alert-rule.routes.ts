@@ -12,7 +12,7 @@ import {
 import { platformRepository } from "../platform/repositories/platform.repository";
 import { cache } from "../../infrastructure/redis/cache";
 import { redisKeyPatterns } from "../../utils/cacheKeys";
-import { evaluateAlertRules } from "./services/alert-evaluation.service";
+import { evaluateAlertRules, evaluateLogAlertRules } from "./services/alert-evaluation.service";
 
 export const alertRuleRouter = Router();
 
@@ -94,6 +94,30 @@ alertRuleRouter.post(
       environment: optionalString(req.body, "environment"),
       metrics: numericMetrics(req.body.metrics),
       healthStatus: optionalString(req.body, "healthStatus"),
+      timestamp: optionalString(req.body, "timestamp")
+    });
+    res.json(result);
+  })
+);
+
+alertRuleRouter.post(
+  "/evaluate-log",
+  asyncHandler(async (req, res) => {
+    const statusCode = optionalNumber(req.body, "statusCode");
+    const metadata = typeof req.body.metadata === "object" && req.body.metadata !== null && !Array.isArray(req.body.metadata) ? req.body.metadata : {};
+    const result = await evaluateLogAlertRules({
+      organizationId: requiredString(req.body, "organizationId"),
+      projectId: optionalString(req.body, "projectId"),
+      serviceId: optionalString(req.body, "serviceId"),
+      serviceName: optionalString(req.body, "serviceName"),
+      environment: optionalString(req.body, "environment"),
+      level: optionalString(req.body, "level"),
+      message: optionalString(req.body, "message"),
+      traceId: optionalString(req.body, "traceId"),
+      requestId: optionalString(req.body, "requestId"),
+      route: optionalString(req.body, "route"),
+      statusCode,
+      metadata,
       timestamp: optionalString(req.body, "timestamp")
     });
     res.json(result);

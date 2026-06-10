@@ -25,7 +25,15 @@ def health() -> dict[str, Any]:
 
     return {
         "status": status,
+        "healthStatus": "degraded" if status == "degraded" else "healthy",
         "service": settings.service_name,
+        "mode": "local",
+        "dependencies": {
+            "postgres": "not_required",
+            "redis": "healthy" if checks["redis"]["status"] == "ok" else "degraded",
+            "kafka": "not_required",
+            "rabbitmq": "healthy" if checks["rabbitmq"]["status"] == "ok" else "degraded",
+        },
         "checks": checks,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }

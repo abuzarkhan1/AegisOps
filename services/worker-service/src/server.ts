@@ -6,6 +6,7 @@ import { ensureRabbitMqQueues } from "./infrastructure/rabbitmq/bootstrap";
 import { RabbitMqTaskPublisher } from "./infrastructure/rabbitmq/publisher";
 import { RabbitMqTaskConsumer } from "./infrastructure/rabbitmq/consumer";
 import { kafkaTopicsConsumed, rabbitMqQueuesProduced } from "./queues/catalog";
+import { runRollups, runRetention } from "./workflows/jobs";
 
 const app = createApp();
 const publisher = new RabbitMqTaskPublisher();
@@ -31,6 +32,21 @@ async function start() {
       logger.error({ error }, "Consumers startup failed");
     }
   }
+
+  // Scheduled background jobs
+  setInterval(() => {
+    runRollups().catch((err) => logger.error({ error: err }, "Error in rollup scheduler"));
+  }, 60_000);
+
+  setInterval(() => {
+    runRetention().catch((err) => logger.error({ error: err }, "Error in retention scheduler"));
+  }, 3_600_000);
+
+  // Trigger once shortly after startup
+  setTimeout(() => {
+    runRollups().catch((err) => logger.error({ error: err }, "Error in startup rollup"));
+    runRetention().catch((err) => logger.error({ error: err }, "Error in startup retention"));
+  }, 5_000);
 
   app.listen(env.PORT, "0.0.0.0", () => {
     logger.info(

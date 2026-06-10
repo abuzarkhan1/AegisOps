@@ -25,6 +25,8 @@ Infrastructure services:
 - Prometheus
 - Grafana
 
+Current local telemetry storage uses PostgreSQL for searchable logs, raw metrics, and aggregate metric buckets. Elasticsearch, Kibana, and Fluent Bit are not part of the active local architecture.
+
 ## Run Locally
 
 Local development runs shared infrastructure in Docker and application services on host-installed runtimes. Compose does not build application images and does not use Go, Node.js, Python, Java, or MongoDB runtime containers.
@@ -99,10 +101,25 @@ curl http://localhost:9090/-/healthy
 | --- | --- |
 | `/api/*`, `/api/openapi.json` | Core API |
 | `/ingest/logs` and `/ingest/logs/batch` | Log Ingester |
-| `/metrics-api/ingest`, `/metrics-api/health-snapshot`, `/metrics-api/services/:serviceId/summary` | Metrics Service |
+| `/metrics-api/metrics/custom`, `/metrics-api/metrics/batch`, `/metrics-api/ingest`, `/metrics-api/health-snapshot`, `/metrics-api/services/:serviceId/summary` | Metrics Service |
 | `/ai/analyze-incident`, `/ai/summarize-logs`, `/ai/generate-postmortem`, `/ai/deployment-impact` | AI RCA Service |
 | `/notify/email`, `/notify/slack`, `/notify/discord`, `/notify/settings/:orgId`, `/notify/history` | Notification Service |
 | `/deployments/*` | Deployment Tracker |
+
+## Validation
+
+```bash
+docker compose config --quiet
+docker compose up -d
+./start_services.sh
+./scripts/smoke-test.sh
+```
+
+Seed demo projects and telemetry:
+
+```bash
+./scripts/seed-demo-data.sh
+```
 
 ## Troubleshooting
 
@@ -113,4 +130,3 @@ curl http://localhost:9090/-/healthy
 - If port `3000`, `5432`, `6379`, or another required port is already in use, stop the conflicting local service or adjust the compose port mapping.
 - If Docker image pulls hang on macOS credential lookup, run `docker logout` or fix Docker Desktop keychain access before pulling public infrastructure images.
 - Some application health endpoints can return `"status": "degraded"` while infrastructure is still warming up. The containers keep running and expose dependency details in the health response.
-

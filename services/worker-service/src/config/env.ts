@@ -13,10 +13,16 @@ export const env = z
     WORKER_CONSUMERS_ENABLED: z
       .string()
       .default("true")
-      .transform((value) => value !== "false")
+      .transform((value) => value !== "false"),
+    LOG_RETENTION_DAYS: z.coerce.number().default(30),
+    RAW_METRIC_RETENTION_DAYS: z.coerce.number().default(14),
+    AGGREGATE_METRIC_RETENTION_DAYS: z.coerce.number().default(180),
+    AUDIT_LOG_RETENTION_DAYS: z.coerce.number().default(365),
+    INCIDENT_EVENT_RETENTION_DAYS: z.coerce.number().default(365)
   })
   .parse(process.env);
 
 export const kafkaBrokers = env.KAFKA_BROKERS.split(",")
   .map((broker) => broker.trim())
   .filter(Boolean);
+

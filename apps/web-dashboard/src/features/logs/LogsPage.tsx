@@ -1,6 +1,6 @@
 import { TerminalSquare, Search, RefreshCw, Layers } from "lucide-react";
 import { useEffect, useState } from "react";
-import { fetchLogs, fetchServices } from "../../shared/api/core";
+import { fetchLogs, fetchOrganizations, fetchProjects, fetchServices } from "../../shared/api/core";
 
 const levelColors: Record<string, string> = {
   fatal: "text-rose-500 font-bold border-rose-500/40 bg-rose-500/10",
@@ -13,10 +13,15 @@ const levelColors: Record<string, string> = {
 export function LogsPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [organizationFilter, setOrganizationFilter] = useState("");
+  const [projectFilter, setProjectFilter] = useState("");
   const [serviceFilter, setServiceFilter] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
   const [envFilter, setEnvFilter] = useState("");
   const [traceFilter, setTraceFilter] = useState("");
+  const [requestFilter, setRequestFilter] = useState("");
   const [routeFilter, setRouteFilter] = useState("");
   const [statusCodeFilter, setStatusCodeFilter] = useState("");
   const [fromFilter, setFromFilter] = useState("");
@@ -27,17 +32,26 @@ export function LogsPage() {
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
 
   useEffect(() => {
-    fetchServices().then(setServices).catch(() => undefined);
+    Promise.all([fetchOrganizations(), fetchProjects(), fetchServices()])
+      .then(([orgRows, projectRows, serviceRows]) => {
+        setOrganizations(orgRows);
+        setProjects(projectRows);
+        setServices(serviceRows);
+      })
+      .catch(() => undefined);
   }, []);
 
   const loadLogs = async () => {
     setLoading(true);
     try {
       const results = await fetchLogs({
-        serviceName: serviceFilter,
+        organizationId: organizationFilter,
+        projectId: projectFilter,
+        serviceId: serviceFilter,
         level: levelFilter,
         environment: envFilter,
         traceId: traceFilter,
+        requestId: requestFilter,
         route: routeFilter,
         statusCode: statusCodeFilter,
         from: fromFilter ? new Date(fromFilter).toISOString() : "",
@@ -55,7 +69,7 @@ export function LogsPage() {
 
   useEffect(() => {
     loadLogs();
-  }, [serviceFilter, levelFilter, envFilter, limit]);
+  }, [organizationFilter, projectFilter, serviceFilter, levelFilter, envFilter, limit]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_auto]">
@@ -78,7 +92,39 @@ export function LogsPage() {
         </div>
 
         {/* Filters Panel */}
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-10">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-400">Organization</label>
+            <select
+              value={organizationFilter}
+              onChange={(e) => setOrganizationFilter(e.target.value)}
+              className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-200 outline-none"
+            >
+              <option value="">All orgs</option>
+              {organizations.map((org) => (
+                <option key={org.id} value={org.id}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-400">Project</label>
+            <select
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+              className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-200 outline-none"
+            >
+              <option value="">All projects</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-slate-400">Service</label>
             <select
@@ -88,7 +134,7 @@ export function LogsPage() {
             >
               <option value="">All Services</option>
               {services.map((svc) => (
-                <option key={svc.id} value={svc.name}>
+                <option key={svc.id} value={svc.id}>
                   {svc.name}
                 </option>
               ))}
@@ -132,6 +178,18 @@ export function LogsPage() {
               placeholder="e.g. req_abc"
               value={traceFilter}
               onChange={(e) => setTraceFilter(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && loadLogs()}
+              className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-200 outline-none placeholder:text-slate-500"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-400">Request ID</label>
+            <input
+              type="text"
+              placeholder="req_abc"
+              value={requestFilter}
+              onChange={(e) => setRequestFilter(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && loadLogs()}
               className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-200 outline-none placeholder:text-slate-500"
             />
@@ -226,7 +284,9 @@ export function LogsPage() {
                 <th className="py-3 pr-4">Service</th>
                 <th className="py-3 pr-4">Level</th>
                 <th className="py-3 pr-4">Message</th>
-                <th className="py-3">Trace ID</th>
+                <th className="py-3 pr-4">Request</th>
+                <th className="py-3 pr-4">Route</th>
+                <th className="py-3">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line/40 text-xs">
@@ -254,14 +314,20 @@ export function LogsPage() {
                   <td className="py-3 pr-4 max-w-lg truncate text-slate-300 font-mono">
                     {log.message}
                   </td>
+                  <td className="py-3 pr-4 whitespace-nowrap font-mono text-slate-400">
+                    {log.requestId || log.traceId || "-"}
+                  </td>
+                  <td className="py-3 pr-4 whitespace-nowrap font-mono text-slate-400">
+                    {log.route || log.metadata?.route || "-"}
+                  </td>
                   <td className="py-3 whitespace-nowrap font-mono text-slate-400">
-                    {log.traceId || "-"}
+                    {log.statusCode || log.metadata?.statusCode || "-"}
                   </td>
                 </tr>
               ))}
               {logs.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-slate-400 font-medium">
+                  <td colSpan={7} className="py-10 text-center text-slate-400 font-medium">
                     No logs found. Try adjusting your filter parameters or send synthetic logs.
                   </td>
                 </tr>
@@ -309,6 +375,24 @@ export function LogsPage() {
             <div>
               <p className="text-[10px] uppercase font-bold text-slate-400 font-mono">Trace ID</p>
               <p className="text-sm text-slate-200 font-mono">{selectedLog.traceId || "-"}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase font-bold text-slate-400 font-mono">Request ID</p>
+              <p className="text-sm text-slate-200 font-mono">{selectedLog.requestId || "-"}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <p className="text-[10px] uppercase font-bold text-slate-400">Route</p>
+                <p className="break-all text-xs text-slate-200 font-mono">{selectedLog.route || selectedLog.metadata?.route || "-"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-slate-400">Status</p>
+                <p className="text-xs text-slate-200 font-mono">{selectedLog.statusCode || selectedLog.metadata?.statusCode || "-"}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-slate-400">Duration</p>
+                <p className="text-xs text-slate-200 font-mono">{selectedLog.durationMs || selectedLog.metadata?.durationMs || "-"}ms</p>
+              </div>
             </div>
             <div>
               <p className="text-[10px] uppercase font-bold text-slate-400">Message</p>

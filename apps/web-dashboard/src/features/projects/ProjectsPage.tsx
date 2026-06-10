@@ -46,6 +46,7 @@ export function ProjectsPage() {
       await createProject({
         organizationId: selectedOrgId,
         name: String(form.get("name") ?? ""),
+        projectKey: String(form.get("projectKey") ?? ""),
         environment: String(form.get("environment") ?? "dev"),
         description: String(form.get("description") ?? "")
       });
@@ -65,6 +66,7 @@ export function ProjectsPage() {
     try {
       await createService(selectedProjectId, {
         name: String(form.get("name") ?? ""),
+        environment: selectedProject?.environment ?? "production",
         serviceType: String(form.get("serviceType") ?? "api"),
         language: String(form.get("language") ?? ""),
         repositoryUrl: String(form.get("repositoryUrl") ?? "")
@@ -99,10 +101,11 @@ export function ProjectsPage() {
           </div>
           <div className="grid gap-3">
             <input name="name" required placeholder="Project name" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" />
+            <input name="projectKey" placeholder="project-key" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" />
             <select name="environment" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm">
               <option value="dev">dev</option>
               <option value="staging">staging</option>
-              <option value="prod">prod</option>
+              <option value="production">production</option>
             </select>
             <input name="description" placeholder="Description" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" />
             <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950">
@@ -118,18 +121,22 @@ export function ProjectsPage() {
             <span className="text-xs text-slate-400">{projects.length}</span>
           </div>
           <div className="space-y-2">
-            {projects.map((project) => (
-              <button
-                key={project.id}
-                onClick={() => setSelectedProjectId(project.id)}
-                className={`w-full rounded-md border p-3 text-left text-sm ${
-                  selectedProjectId === project.id ? "border-mint/50 bg-mint/10" : "border-line bg-[#0d1419]"
-                }`}
-              >
-                <span className="block truncate font-medium text-white">{project.name}</span>
-                <span className="text-xs text-slate-400">{project.environment}</span>
-              </button>
-            ))}
+            {projects.map((project) => {
+              const serviceCount = services.filter((service) => service.projectId === project.id).length;
+              const mode = serviceCount <= 1 ? "monolith" : "microservices";
+              return (
+                <button
+                  key={project.id}
+                  onClick={() => setSelectedProjectId(project.id)}
+                  className={`w-full rounded-md border p-3 text-left text-sm ${
+                    selectedProjectId === project.id ? "border-mint/50 bg-mint/10" : "border-line bg-[#0d1419]"
+                  }`}
+                >
+                  <span className="block truncate font-medium text-white">{project.name}</span>
+                  <span className="text-xs text-slate-400">{project.projectKey ?? project.environment} · {mode}</span>
+                </button>
+              );
+            })}
             {projects.length === 0 ? <EmptyState title="No projects yet" /> : null}
           </div>
         </div>

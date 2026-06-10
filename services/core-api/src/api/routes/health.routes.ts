@@ -12,7 +12,16 @@ const healthHandler = asyncHandler(async (_req, res) => {
 
   res.json({
     status: degraded ? "degraded" : "ok",
+    healthStatus: degraded ? "degraded" : "healthy",
     service: env.SERVICE_NAME,
+    timestamp: new Date().toISOString(),
+    mode: "local",
+    dependencies: {
+      postgres: checks.postgres?.status === "ok" ? "healthy" : "degraded",
+      redis: checks.redis?.status === "ok" ? "healthy" : "degraded",
+      kafka: checks.kafka?.status === "ok" ? "healthy" : "degraded",
+      rabbitmq: "not_required"
+    },
     uptimeSeconds: Math.round(process.uptime()),
     checks
   });

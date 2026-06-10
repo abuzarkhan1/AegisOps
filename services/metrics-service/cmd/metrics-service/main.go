@@ -28,24 +28,45 @@ import (
 )
 
 type metricPayload struct {
-	ServiceName string            `json:"serviceName"`
-	ServiceID   string            `json:"serviceId,omitempty"`
-	Environment string            `json:"environment"`
-	MetricName  string            `json:"metricName"`
-	Value       float64           `json:"value"`
-	Timestamp   string            `json:"timestamp"`
-	Labels      map[string]string `json:"labels,omitempty"`
+	OrganizationID string            `json:"organizationId,omitempty"`
+	ProjectID      string            `json:"projectId,omitempty"`
+	ProjectKey     string            `json:"projectKey,omitempty"`
+	ServiceName    string            `json:"serviceName"`
+	ServiceID      string            `json:"serviceId,omitempty"`
+	Environment    string            `json:"environment"`
+	MetricName     string            `json:"metricName"`
+	Value          float64           `json:"value"`
+	Timestamp      string            `json:"timestamp"`
+	Labels         map[string]string `json:"labels,omitempty"`
 }
 
 type metricSnapshotPayload struct {
 	OrganizationID string             `json:"organizationId,omitempty"`
 	ProjectID      string             `json:"projectId,omitempty"`
+	ProjectKey     string             `json:"projectKey,omitempty"`
 	ServiceName    string             `json:"serviceName"`
 	ServiceID      string             `json:"serviceId,omitempty"`
 	Environment    string             `json:"environment"`
 	Timestamp      string             `json:"timestamp"`
 	Metrics        map[string]float64 `json:"metrics"`
 	Labels         map[string]string  `json:"labels,omitempty"`
+}
+
+type metricBatchItem struct {
+	MetricName string            `json:"metricName"`
+	Value      float64           `json:"value"`
+	Timestamp  string            `json:"timestamp"`
+	Labels     map[string]string `json:"labels,omitempty"`
+}
+
+type metricBatchPayload struct {
+	OrganizationID string            `json:"organizationId,omitempty"`
+	ProjectID      string            `json:"projectId,omitempty"`
+	ProjectKey     string            `json:"projectKey,omitempty"`
+	ServiceName    string            `json:"serviceName"`
+	ServiceID      string            `json:"serviceId,omitempty"`
+	Environment    string            `json:"environment"`
+	Metrics        []metricBatchItem `json:"metrics"`
 }
 
 type healthSnapshotPayload struct {
@@ -87,7 +108,10 @@ type apiKeyValidator struct {
 
 type apiKeyContext struct {
 	OrganizationID string
+	ProjectID      string
+	ProjectKey     string
 	ServiceID      string
+	ServiceName    string
 }
 
 var customMetricsReceived = prometheus.NewCounterVec(
@@ -123,6 +147,9 @@ func main() {
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/health", healthHandler(serviceName, brokers, redisAddr, coreAPIURL))
 	mux.HandleFunc("/metrics/custom", metricsHandler(logger, writer, validator))
+	mux.HandleFunc("/metrics-api/metrics/custom", metricsHandler(logger, writer, validator))
+	mux.HandleFunc("/metrics/batch", batchMetricsHandler(logger, writer, validator))
+	mux.HandleFunc("/metrics-api/metrics/batch", batchMetricsHandler(logger, writer, validator))
 	mux.HandleFunc("/ingest", metricsIngestHandler(logger, writer, validator, store))
 	mux.HandleFunc("/metrics-api/ingest", metricsIngestHandler(logger, writer, validator, store))
 	mux.HandleFunc("/health-snapshot", healthSnapshotHandler(logger, writer, validator, store))
@@ -164,6 +191,7 @@ func metricsHandler(logger *slog.Logger, writer *kafka.Writer, validator *apiKey
 		if !authorizeRequest(w, r, logger, validator) {
 			return
 		}
+		apiKey := r.Header.Get("X-API-Key")
 
 		var payload metricPayload
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -176,16 +204,28 @@ func metricsHandler(logger *slog.Logger, writer *kafka.Writer, validator *apiKey
 			return
 		}
 
+		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey)
+		if contextErr != nil {
+			logger.Error("API key context lookup failed", "error", contextErr)
+		}
+		organizationID := firstNonEmpty(payload.OrganizationID, keyContext.OrganizationID)
+		projectID := firstNonEmpty(payload.ProjectID, keyContext.ProjectID)
+		projectKey := firstNonEmpty(payload.ProjectKey, keyContext.ProjectKey)
+		serviceID := firstNonEmpty(payload.ServiceID, keyContext.ServiceID)
+
 		body, err := json.Marshal(map[string]interface{}{
-			"eventType":   "metrics.received",
-			"serviceName": payload.ServiceName,
-			"serviceId":   payload.ServiceID,
-			"environment": payload.Environment,
-			"metricName":  payload.MetricName,
-			"value":       payload.Value,
-			"timestamp":   payload.Timestamp,
-			"labels":      payload.Labels,
-			"receivedAt":  time.Now().UTC().Format(time.RFC3339Nano),
+			"eventType":      "metrics.received",
+			"organizationId": organizationID,
+			"projectId":      projectID,
+			"projectKey":     projectKey,
+			"serviceName":    payload.ServiceName,
+			"serviceId":      serviceID,
+			"environment":    payload.Environment,
+			"metricName":     payload.MetricName,
+			"value":          payload.Value,
+			"timestamp":      payload.Timestamp,
+			"labels":         payload.Labels,
+			"receivedAt":     time.Now().UTC().Format(time.RFC3339Nano),
 		})
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to encode Kafka message"})
@@ -204,7 +244,119 @@ func metricsHandler(logger *slog.Logger, writer *kafka.Writer, validator *apiKey
 		}
 
 		customMetricsReceived.WithLabelValues(payload.ServiceName, payload.Environment, payload.MetricName).Inc()
+		if contextErr == nil {
+			snapshot := metricSnapshotPayload{
+				OrganizationID: organizationID,
+				ProjectID:      projectID,
+				ProjectKey:     projectKey,
+				ServiceName:    payload.ServiceName,
+				ServiceID:      serviceID,
+				Environment:    payload.Environment,
+				Timestamp:      payload.Timestamp,
+				Metrics:        map[string]float64{payload.MetricName: payload.Value},
+				Labels:         payload.Labels,
+			}
+			if err := evaluateAlertRules(r.Context(), validator.coreAPIURL, snapshot, keyContext); err != nil {
+				logger.Error("Alert rule evaluation failed", "error", err, "serviceName", payload.ServiceName, "metricName", payload.MetricName)
+			}
+		}
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted", "topic": "metrics.received"})
+	}
+}
+
+func batchMetricsHandler(logger *slog.Logger, writer *kafka.Writer, validator *apiKeyValidator) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		if !authorizeRequest(w, r, logger, validator) {
+			return
+		}
+
+		apiKey := r.Header.Get("X-API-Key")
+		limited, err := isRateLimited(r.Context(), validator.redisAddr, "metrics-batch", apiKey, 300)
+		if err != nil {
+			logger.Error("Rate limit check failed", "error", err)
+		} else if limited {
+			writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate limit exceeded"})
+			return
+		}
+
+		var payload metricBatchPayload
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON payload"})
+			return
+		}
+		if err := validateMetricBatch(payload); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+
+		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey)
+		if contextErr != nil {
+			logger.Error("API key context lookup failed", "error", contextErr)
+		}
+		payload.OrganizationID = firstNonEmpty(payload.OrganizationID, keyContext.OrganizationID)
+		payload.ProjectID = firstNonEmpty(payload.ProjectID, keyContext.ProjectID)
+		payload.ProjectKey = firstNonEmpty(payload.ProjectKey, keyContext.ProjectKey)
+		payload.ServiceID = firstNonEmpty(payload.ServiceID, keyContext.ServiceID)
+
+		messages := make([]kafka.Message, 0, len(payload.Metrics))
+		metricsForAlert := make(map[string]float64, len(payload.Metrics))
+		for _, item := range payload.Metrics {
+			metricsForAlert[item.MetricName] = item.Value
+			body, err := json.Marshal(map[string]interface{}{
+				"eventType":      "metrics.received",
+				"organizationId": payload.OrganizationID,
+				"projectId":      payload.ProjectID,
+				"projectKey":     payload.ProjectKey,
+				"serviceName":    payload.ServiceName,
+				"serviceId":      payload.ServiceID,
+				"environment":    payload.Environment,
+				"metricName":     item.MetricName,
+				"value":          item.Value,
+				"timestamp":      item.Timestamp,
+				"labels":         item.Labels,
+				"receivedAt":     time.Now().UTC().Format(time.RFC3339Nano),
+			})
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to encode Kafka message"})
+				return
+			}
+			messages = append(messages, kafka.Message{
+				Key:   []byte(payload.ServiceName + ":" + item.MetricName),
+				Value: body,
+			})
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		if err := writer.WriteMessages(ctx, messages...); err != nil {
+			logger.Error("Failed to publish metrics batch", "error", err, "topic", "metrics.received", "count", len(messages))
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "failed to publish metrics batch"})
+			return
+		}
+
+		for _, item := range payload.Metrics {
+			customMetricsReceived.WithLabelValues(payload.ServiceName, payload.Environment, item.MetricName).Inc()
+		}
+		if contextErr == nil {
+			snapshot := metricSnapshotPayload{
+				OrganizationID: payload.OrganizationID,
+				ProjectID:      payload.ProjectID,
+				ProjectKey:     payload.ProjectKey,
+				ServiceName:    payload.ServiceName,
+				ServiceID:      payload.ServiceID,
+				Environment:    payload.Environment,
+				Timestamp:      payload.Metrics[len(payload.Metrics)-1].Timestamp,
+				Metrics:        metricsForAlert,
+			}
+			if err := evaluateAlertRules(r.Context(), validator.coreAPIURL, snapshot, keyContext); err != nil {
+				logger.Error("Alert rule evaluation failed", "error", err, "serviceName", payload.ServiceName)
+			}
+		}
+		writeJSON(w, http.StatusAccepted, map[string]interface{}{"status": "accepted", "topic": "metrics.received", "count": len(payload.Metrics)})
 	}
 }
 
@@ -237,15 +389,27 @@ func metricsIngestHandler(logger *slog.Logger, writer *kafka.Writer, validator *
 			return
 		}
 
+		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey)
+		if contextErr != nil {
+			logger.Error("API key context lookup failed", "error", contextErr)
+		}
+		payload.OrganizationID = firstNonEmpty(payload.OrganizationID, keyContext.OrganizationID)
+		payload.ProjectID = firstNonEmpty(payload.ProjectID, keyContext.ProjectID)
+		payload.ProjectKey = firstNonEmpty(payload.ProjectKey, keyContext.ProjectKey)
+		payload.ServiceID = firstNonEmpty(payload.ServiceID, keyContext.ServiceID)
+
 		body, err := json.Marshal(map[string]interface{}{
-			"eventType":   "metrics.received",
-			"serviceName": payload.ServiceName,
-			"serviceId":   payload.ServiceID,
-			"environment": payload.Environment,
-			"timestamp":   payload.Timestamp,
-			"metrics":     payload.Metrics,
-			"labels":      payload.Labels,
-			"receivedAt":  time.Now().UTC().Format(time.RFC3339Nano),
+			"eventType":      "metrics.received",
+			"organizationId": payload.OrganizationID,
+			"projectId":      payload.ProjectID,
+			"projectKey":     payload.ProjectKey,
+			"serviceName":    payload.ServiceName,
+			"serviceId":      payload.ServiceID,
+			"environment":    payload.Environment,
+			"timestamp":      payload.Timestamp,
+			"metrics":        payload.Metrics,
+			"labels":         payload.Labels,
+			"receivedAt":     time.Now().UTC().Format(time.RFC3339Nano),
 		})
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to encode Kafka message"})
@@ -267,10 +431,10 @@ func metricsIngestHandler(logger *slog.Logger, writer *kafka.Writer, validator *
 			customMetricsReceived.WithLabelValues(payload.ServiceName, payload.Environment, name).Inc()
 		}
 		store.recordMetrics(payload)
-		if keyContext, err := validator.resolveContext(r.Context(), apiKey); err != nil {
-			logger.Error("API key context lookup failed; skipping alert evaluation", "error", err)
-		} else if err := evaluateAlertRules(r.Context(), validator.coreAPIURL, payload, keyContext); err != nil {
-			logger.Error("Alert rule evaluation failed", "error", err, "serviceName", payload.ServiceName)
+		if contextErr == nil {
+			if err := evaluateAlertRules(r.Context(), validator.coreAPIURL, payload, keyContext); err != nil {
+				logger.Error("Alert rule evaluation failed", "error", err, "serviceName", payload.ServiceName)
+			}
 		}
 		writeJSON(w, http.StatusAccepted, map[string]interface{}{"status": "accepted", "topic": "metrics.received"})
 	}
@@ -295,16 +459,26 @@ func healthSnapshotHandler(logger *slog.Logger, writer *kafka.Writer, validator 
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
+		apiKey := r.Header.Get("X-API-Key")
+		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey)
+		if contextErr != nil {
+			logger.Error("API key context lookup failed", "error", contextErr)
+		}
+		payload.OrganizationID = firstNonEmpty(payload.OrganizationID, keyContext.OrganizationID)
+		payload.ProjectID = firstNonEmpty(payload.ProjectID, keyContext.ProjectID)
+		payload.ServiceID = firstNonEmpty(payload.ServiceID, keyContext.ServiceID)
 
 		body, err := json.Marshal(map[string]interface{}{
-			"eventType":   "service.health.changed",
-			"serviceName": payload.ServiceName,
-			"serviceId":   payload.ServiceID,
-			"environment": payload.Environment,
-			"status":      payload.Status,
-			"timestamp":   payload.Timestamp,
-			"metadata":    payload.Metadata,
-			"receivedAt":  time.Now().UTC().Format(time.RFC3339Nano),
+			"eventType":      "service.health.changed",
+			"organizationId": payload.OrganizationID,
+			"projectId":      payload.ProjectID,
+			"serviceName":    payload.ServiceName,
+			"serviceId":      payload.ServiceID,
+			"environment":    payload.Environment,
+			"status":         payload.Status,
+			"timestamp":      payload.Timestamp,
+			"metadata":       payload.Metadata,
+			"receivedAt":     time.Now().UTC().Format(time.RFC3339Nano),
 		})
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to encode Kafka message"})
@@ -323,11 +497,10 @@ func healthSnapshotHandler(logger *slog.Logger, writer *kafka.Writer, validator 
 		}
 
 		store.recordHealth(payload)
-		apiKey := r.Header.Get("X-API-Key")
-		if keyContext, err := validator.resolveContext(r.Context(), apiKey); err != nil {
-			logger.Error("API key context lookup failed; skipping health alert evaluation", "error", err)
-		} else if err := evaluateHealthAlertRules(r.Context(), validator.coreAPIURL, payload, keyContext); err != nil {
-			logger.Error("Health alert rule evaluation failed", "error", err, "serviceName", payload.ServiceName)
+		if contextErr == nil {
+			if err := evaluateHealthAlertRules(r.Context(), validator.coreAPIURL, payload, keyContext); err != nil {
+				logger.Error("Health alert rule evaluation failed", "error", err, "serviceName", payload.ServiceName)
+			}
 		}
 		writeJSON(w, http.StatusAccepted, map[string]interface{}{"status": "accepted", "topic": "metrics.received"})
 	}
@@ -384,10 +557,14 @@ func healthHandler(serviceName string, brokers []string, redisAddr string, coreA
 		}
 
 		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"status":  status,
-			"service": serviceName,
-			"topic":   "metrics.received",
-			"checks":  checks,
+			"status":       status,
+			"healthStatus": degradedStatus(status),
+			"service":      serviceName,
+			"timestamp":    time.Now().UTC().Format(time.RFC3339Nano),
+			"mode":         "local",
+			"topic":        "metrics.received",
+			"dependencies": dependencyStatuses(checks, map[string]string{"postgres": "not_required", "rabbitmq": "not_required"}),
+			"checks":       checks,
 		})
 	}
 }
@@ -471,7 +648,10 @@ func (validator *apiKeyValidator) resolveContext(ctx context.Context, rawKey str
 		Valid  bool `json:"valid"`
 		APIKey struct {
 			OrganizationID string `json:"organizationId"`
+			ProjectID      string `json:"projectId"`
+			ProjectKey     string `json:"projectKey"`
 			ServiceID      string `json:"serviceId"`
+			ServiceName    string `json:"serviceName"`
 		} `json:"apiKey"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&validation); err != nil {
@@ -482,7 +662,10 @@ func (validator *apiKeyValidator) resolveContext(ctx context.Context, rawKey str
 	}
 	return apiKeyContext{
 		OrganizationID: validation.APIKey.OrganizationID,
+		ProjectID:      validation.APIKey.ProjectID,
+		ProjectKey:     validation.APIKey.ProjectKey,
 		ServiceID:      validation.APIKey.ServiceID,
+		ServiceName:    validation.APIKey.ServiceName,
 	}, nil
 }
 
@@ -492,9 +675,10 @@ func evaluateAlertRules(ctx context.Context, coreAPIURL string, payload metricSn
 		return nil
 	}
 	serviceID := firstNonEmpty(payload.ServiceID, keyContext.ServiceID)
+	projectID := firstNonEmpty(payload.ProjectID, keyContext.ProjectID)
 	requestBody := map[string]interface{}{
 		"organizationId": organizationID,
-		"projectId":      payload.ProjectID,
+		"projectId":      projectID,
 		"serviceId":      serviceID,
 		"serviceName":    payload.ServiceName,
 		"environment":    payload.Environment,
@@ -510,9 +694,10 @@ func evaluateHealthAlertRules(ctx context.Context, coreAPIURL string, payload he
 		return nil
 	}
 	serviceID := firstNonEmpty(payload.ServiceID, keyContext.ServiceID)
+	projectID := firstNonEmpty(payload.ProjectID, keyContext.ProjectID)
 	requestBody := map[string]interface{}{
 		"organizationId": organizationID,
-		"projectId":      payload.ProjectID,
+		"projectId":      projectID,
 		"serviceId":      serviceID,
 		"serviceName":    payload.ServiceName,
 		"environment":    payload.Environment,
@@ -679,6 +864,33 @@ func validateMetricSnapshot(payload metricSnapshotPayload) error {
 	return nil
 }
 
+func validateMetricBatch(payload metricBatchPayload) error {
+	if strings.TrimSpace(payload.ServiceName) == "" {
+		return errors.New("serviceName is required")
+	}
+	if strings.TrimSpace(payload.Environment) == "" {
+		return errors.New("environment is required")
+	}
+	if len(payload.Metrics) == 0 {
+		return errors.New("metrics must contain at least one item")
+	}
+	if len(payload.Metrics) > 500 {
+		return errors.New("metrics batch cannot exceed 500 items")
+	}
+	for index, item := range payload.Metrics {
+		if strings.TrimSpace(item.MetricName) == "" {
+			return fmt.Errorf("metrics[%d].metricName is required", index)
+		}
+		if strings.TrimSpace(item.Timestamp) == "" {
+			return fmt.Errorf("metrics[%d].timestamp is required", index)
+		}
+		if _, err := time.Parse(time.RFC3339, item.Timestamp); err != nil {
+			return fmt.Errorf("metrics[%d].timestamp must be RFC3339", index)
+		}
+	}
+	return nil
+}
+
 func validateHealthSnapshot(payload healthSnapshotPayload) error {
 	if strings.TrimSpace(payload.ServiceName) == "" {
 		return errors.New("serviceName is required")
@@ -768,6 +980,28 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func degradedStatus(status string) string {
+	if status == "ok" {
+		return "healthy"
+	}
+	return "degraded"
+}
+
+func dependencyStatuses(checks map[string]checkResult, defaults map[string]string) map[string]string {
+	out := make(map[string]string, len(checks)+len(defaults))
+	for key, value := range defaults {
+		out[key] = value
+	}
+	for key, value := range checks {
+		if value.Status == "ok" {
+			out[key] = "healthy"
+		} else {
+			out[key] = "degraded"
+		}
+	}
+	return out
 }
 
 func serviceIDFromSummaryPath(path string) (string, bool) {

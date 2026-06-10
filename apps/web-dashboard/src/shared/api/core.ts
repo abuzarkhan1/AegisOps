@@ -32,6 +32,7 @@ export type OrganizationRecord = {
 export type ProjectRecord = {
   id: string;
   organizationId: string;
+  projectKey?: string;
   name: string;
   environment: string;
   description?: string;
@@ -83,6 +84,42 @@ export type NotificationHistoryRecord = {
   subject: string;
   destination: string;
   createdAt: string;
+};
+
+export type MetricRecord = {
+  id: string;
+  organizationId?: string;
+  projectId?: string;
+  serviceId?: string;
+  projectKey?: string;
+  serviceName: string;
+  environment: string;
+  metricName: string;
+  value: number;
+  labels: Record<string, unknown>;
+  timestamp: string;
+  createdAt: string;
+};
+
+export type MetricAggregateRecord = {
+  id: string;
+  organizationId?: string;
+  projectId?: string;
+  serviceId?: string;
+  projectKey?: string;
+  serviceName: string;
+  environment: string;
+  metricName: string;
+  window: string;
+  timestampBucket: string;
+  count: number;
+  sum: number;
+  avg: number;
+  min: number;
+  max: number;
+  p50: number;
+  p95: number;
+  p99: number;
 };
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -200,6 +237,22 @@ export async function ingestMetric(apiKey: string, payload: Record<string, unkno
   });
 }
 
+export async function ingestCustomMetric(apiKey: string, payload: Record<string, unknown>) {
+  return request<{ status: string; topic: string }>(`${gatewayUrl}/metrics-api/metrics/custom`, {
+    method: "POST",
+    headers: { "X-API-Key": apiKey },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function ingestBatchMetrics(apiKey: string, payload: Record<string, unknown>) {
+  return request<{ status: string; topic: string; count: number }>(`${gatewayUrl}/metrics-api/metrics/batch`, {
+    method: "POST",
+    headers: { "X-API-Key": apiKey },
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function fetchDeployments() {
   const data = await request<{ deployments: DeploymentRecord[] }>(`${gatewayUrl}/deployments`);
   return data.deployments.map((deployment: any) => ({
@@ -261,6 +314,34 @@ export async function fetchLogs(params?: Record<string, string | number>) {
   const url = `${coreApiUrl}/api/logs${queryString ? "?" + queryString : ""}`;
   const data = await request<{ logs: any[] }>(url);
   return data.logs;
+}
+
+export async function fetchMetrics(params?: Record<string, string | number>) {
+  const query = new URLSearchParams();
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") {
+        query.set(key, String(value));
+      }
+    }
+  }
+  const data = await request<{ metrics: MetricRecord[] }>(`${coreApiUrl}/api/telemetry/metrics${query.toString() ? `?${query}` : ""}`);
+  return data.metrics;
+}
+
+export async function fetchMetricAggregates(params?: Record<string, string | number>) {
+  const query = new URLSearchParams();
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") {
+        query.set(key, String(value));
+      }
+    }
+  }
+  const data = await request<{ aggregates: MetricAggregateRecord[] }>(
+    `${coreApiUrl}/api/telemetry/metric-aggregates${query.toString() ? `?${query}` : ""}`
+  );
+  return data.aggregates;
 }
 
 export async function fetchIncidentTimeline(incidentId: string) {

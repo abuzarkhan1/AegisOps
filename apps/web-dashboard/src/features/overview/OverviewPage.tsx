@@ -40,7 +40,10 @@ export function OverviewPage({ health }: { health: Record<string, HealthResult> 
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <MetricRow label="Projects" value={String(summary.projectsMonitored ?? 0)} />
+        </div>
         <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
           <MetricRow label="Services" value={String(summary.servicesMonitored ?? 0)} />
         </div>
@@ -58,6 +61,27 @@ export function OverviewPage({ health }: { health: Record<string, HealthResult> 
         </div>
         <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
           <MetricRow label="Critical" value={String(summary.criticalIncidents ?? 0)} />
+        </div>
+        <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <MetricRow label="Req / Sec" value={Number(summary.requestsPerSecond ?? 0).toFixed(2)} />
+        </div>
+        <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <MetricRow label="Throughput" value={String(Math.round(Number(summary.totalThroughput ?? 0)))} />
+        </div>
+        <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <MetricRow label="Error Rate" value={`${Number(summary.errorRate ?? 0).toFixed(1)}%`} />
+        </div>
+        <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <MetricRow label="P95 Latency" value={`${Math.round(Number(summary.p95LatencyMs ?? 0))}ms`} />
+        </div>
+        <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <MetricRow label="Uptime" value={`${Number(summary.uptimePercent ?? 0).toFixed(1)}%`} />
+        </div>
+        <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <MetricRow label="Logs Ingested" value={String(summary.logsIngested ?? 0)} />
+        </div>
+        <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <MetricRow label="Metrics Ingested" value={String(summary.metricsIngested ?? 0)} />
         </div>
       </div>
 

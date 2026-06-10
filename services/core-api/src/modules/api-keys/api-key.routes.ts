@@ -67,6 +67,8 @@ apiKeyRouter.post(
   "/api-keys/validate",
   asyncHandler(async (req, res) => {
     const apiKey = await apiKeyService.validate(requiredString(req.body, "apiKey"));
+    const service = apiKey?.serviceId ? await platformRepository.getService(apiKey.serviceId) : undefined;
+    const project = service?.projectId ? await platformRepository.getProject(service.projectId) : undefined;
     res.json({
       valid: Boolean(apiKey),
       apiKey: apiKey
@@ -74,6 +76,9 @@ apiKeyRouter.post(
             id: apiKey.id,
             organizationId: apiKey.organizationId,
             serviceId: apiKey.serviceId,
+            serviceName: service?.name,
+            projectId: service?.projectId,
+            projectKey: project?.projectKey,
             prefix: apiKey.prefix,
             status: apiKey.status,
             lastUsedAt: apiKey.lastUsedAt

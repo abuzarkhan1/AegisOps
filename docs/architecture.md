@@ -6,7 +6,7 @@ The local foundation mirrors the PRD's production shape:
 - Application services expose direct local ports for development and gateway routes for integrated testing.
 - Kafka is the high-volume event stream for logs, metrics, deployments, incidents, alerts, and audit events.
 - RabbitMQ is reserved for reliable background work such as AI analysis, notifications, reports, escalations, and deployment impact analysis.
-- PostgreSQL stores business data.
+- PostgreSQL stores business data, searchable logs, raw metrics, metric aggregates, incident evidence, AI RCA reports, and deployment impacts in the local version.
 - Redis stores organization cache, API key cache, rate-limit counters, and dashboard summaries.
 - Prometheus scrapes service metrics and Grafana is provisioned with a Prometheus datasource.
 - Local development runs application services on host-installed runtimes. Docker Compose starts only shared infrastructure and the gateway.
@@ -69,4 +69,6 @@ The worker declares durable task queues with the `aegisops.dlx` dead-letter exch
 - `service:{serviceId}:config`
 - `deployment:{deploymentId}:impact`
 - `incident:{incidentId}:summary`
+- `metrics:{orgId}:{projectId}:{serviceId}:summary:{timeRange}`
+- `logs:{orgId}:{projectId}:{serviceId}:recent`
 - `rate-limit:{apiKey}:{minute}`

@@ -2226,8 +2226,7 @@ aegisops/
 │   ├── nginx/
 │   ├── prometheus/
 │   ├── grafana/
-│   ├── fluent-bit/
-│   ├── elasticsearch/
+│   ├── postgres-monitoring/
 │   └── k8s/
 │
 ├── docs/
@@ -2258,7 +2257,7 @@ These features are not required in the first version:
 - Kubernetes production deployment
 - Paid billing system
 - Mobile app
-- OpenTelemetry distributed tracing
+- Full distributed tracing infrastructure
 - Advanced anomaly detection models
 - SSO/SAML login
 - On-call scheduling
@@ -2273,8 +2272,7 @@ These can be added after the core system is working.
 
 - Kubernetes manifests
 - Helm charts
-- OpenTelemetry tracing
-- Jaeger integration
+- Optional enterprise search/log analytics extension
 - PagerDuty integration
 - Microsoft Teams integration
 - WhatsApp alerts
@@ -2374,4 +2372,3 @@ Build in this order:
 ```
 
 Do not start with UI only. The power of this project is the backend architecture, event flow, observability, and AI incident analysis.
-

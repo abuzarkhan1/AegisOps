@@ -189,10 +189,93 @@ export class DeploymentRepository {
       `,
       [deploymentId, JSON.stringify(metadata)]
     );
-    return metadata.impact;
+    const beforeMetrics = typeof impactData.beforeMetrics === "object" && impactData.beforeMetrics !== null ? impactData.beforeMetrics : {};
+    const afterMetrics = typeof impactData.afterMetrics === "object" && impactData.afterMetrics !== null ? impactData.afterMetrics : {};
+    const result = await db.query(
+      `
+      INSERT INTO deployment_impacts (
+        id,
+        deployment_id,
+        service_id,
+        environment,
+        before_metrics,
+        after_metrics,
+        summary,
+        risk,
+        recommendation,
+        payload
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ON CONFLICT (deployment_id)
+      DO UPDATE SET
+        before_metrics = excluded.before_metrics,
+        after_metrics = excluded.after_metrics,
+        summary = excluded.summary,
+        risk = excluded.risk,
+        recommendation = excluded.recommendation,
+        payload = excluded.payload,
+        updated_at = now()
+      RETURNING deployment_id AS "deploymentId",
+                service_id AS "serviceId",
+                environment,
+                before_metrics AS "beforeMetrics",
+                after_metrics AS "afterMetrics",
+                summary,
+                risk,
+                recommendation,
+                payload,
+                created_at AS "createdAt",
+                updated_at AS "updatedAt"
+      `,
+      [
+        crypto.randomUUID(),
+        deploymentId,
+        uuidOrNull(deployment.serviceId),
+        deployment.environment,
+        JSON.stringify(beforeMetrics),
+        JSON.stringify(afterMetrics),
+        typeof impactData.summary === "string" ? impactData.summary : null,
+        typeof impactData.risk === "string" ? impactData.risk : null,
+        typeof impactData.recommendation === "string" ? impactData.recommendation : null,
+        JSON.stringify({ deploymentId, serviceName: deployment.serviceName, status: "complete", ...impactData })
+      ]
+    );
+    return {
+      ...metadata.impact,
+      ...result.rows[0],
+      createdAt: toIso(result.rows[0].createdAt),
+      updatedAt: toIso(result.rows[0].updatedAt)
+    };
   }
 
   async impact(deploymentId: string) {
+    const impactResult = await db.query(
+      `
+      SELECT deployment_id AS "deploymentId",
+             service_id AS "serviceId",
+             environment,
+             before_metrics AS "beforeMetrics",
+             after_metrics AS "afterMetrics",
+             summary,
+             risk,
+             recommendation,
+             payload,
+             created_at AS "createdAt",
+             updated_at AS "updatedAt"
+      FROM deployment_impacts
+      WHERE deployment_id = $1
+      `,
+      [deploymentId]
+    );
+    if (impactResult.rowCount) {
+      const row = impactResult.rows[0];
+      return {
+        ...row.payload,
+        ...row,
+        createdAt: toIso(row.createdAt),
+        updatedAt: toIso(row.updatedAt)
+      };
+    }
     const deployment = await this.get(deploymentId);
     if (!deployment) return undefined;
     if (deployment.metadata && (deployment.metadata as any).impact) {

@@ -37,6 +37,7 @@ serviceRouter.post(
       organizationId: project.organizationId,
       projectId: project.id,
       name: requiredString(req.body, "name"),
+      environment: optionalString(req.body, "environment") ?? project.environment,
       serviceType: serviceType(req.body.serviceType),
       language: optionalString(req.body, "language"),
       repositoryUrl: optionalString(req.body, "repositoryUrl")
@@ -83,6 +84,7 @@ serviceRouter.patch(
 
     const service = await platformRepository.updateService(serviceId, {
       name: optionalString(req.body, "name"),
+      environment: optionalString(req.body, "environment"),
       serviceType: serviceType(req.body.serviceType),
       language: optionalString(req.body, "language"),
       repositoryUrl: optionalString(req.body, "repositoryUrl"),

@@ -8,7 +8,16 @@ docker compose up -d
 
 # Check health of Docker Compose services
 echo "Waiting for Docker containers to be healthy..."
-sleep 3
+for i in {1..30}; do
+  if docker compose exec -T postgres pg_isready -U "${POSTGRES_USER:-aegisops}" -d "${POSTGRES_DB:-aegisops}" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+
+echo "Applying database migrations..."
+(cd "/Users/abuzar/Desktop/AegisOps/services/core-api" && npm run migrate)
+(cd "/Users/abuzar/Desktop/AegisOps/services/deployment-tracker" && npm run migrate)
 
 # Command helper to launch a new tab with a command in Terminal.app
 run_in_new_tab() {

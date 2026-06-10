@@ -11,6 +11,9 @@ export const redisKeyPatterns = {
   serviceConfig: (serviceId: string) => `service:${serviceId}:config`,
   deploymentImpact: (deploymentId: string) => `deployment:${deploymentId}:impact`,
   incidentSummary: (incidentId: string) => `incident:${incidentId}:summary`,
+  metricsSummary: (orgId: string, projectId: string, serviceId: string, timeRange: string) =>
+    `metrics:${orgId}:${projectId}:${serviceId}:summary:${timeRange}`,
+  recentLogs: (orgId: string, projectId: string, serviceId: string) => `logs:${orgId}:${projectId}:${serviceId}:recent`,
   rateLimit: (apiKey: string, minute: string) => `rate-limit:${apiKey}:${minute}`
 };
 
@@ -27,5 +30,7 @@ export const documentedRedisPatterns = [
   "service:{serviceId}:config",
   "deployment:{deploymentId}:impact",
   "incident:{incidentId}:summary",
+  "metrics:{orgId}:{projectId}:{serviceId}:summary:{timeRange}",
+  "logs:{orgId}:{projectId}:{serviceId}:recent",
   "rate-limit:{apiKey}:{minute}"
 ];

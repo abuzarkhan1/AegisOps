@@ -1,125 +1,314 @@
-import { Activity, Gauge, Send } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
-import { fetchDashboardSummary, fetchErrorTrends, fetchServices, ingestMetric, type ServiceRecord } from "../../shared/api/core";
+import { Activity, Gauge, Layers, RefreshCw, Send } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  fetchMetricAggregates,
+  fetchMetrics,
+  fetchOrganizations,
+  fetchProjects,
+  fetchServices,
+  ingestBatchMetrics,
+  ingestCustomMetric,
+  type MetricAggregateRecord,
+  type MetricRecord,
+  type OrganizationRecord,
+  type ProjectRecord,
+  type ServiceRecord
+} from "../../shared/api/core";
 import { MetricRow } from "../../shared/ui/MetricRow";
 
+const throughputMetrics = new Set(["http_requests_total", "request_count", "requestCount", "service_events_total", "worker_jobs_processed_total"]);
+const errorMetrics = new Set(["http_errors_total", "http_5xx_total", "error_count", "errorCount", "exceptions_total"]);
+const latencyMetrics = new Set(["http_request_duration_ms", "http_request_duration_p95", "p95LatencyMs", "p95_latency"]);
+
+const timeRanges = [
+  { label: "1h", hours: 1 },
+  { label: "6h", hours: 6 },
+  { label: "24h", hours: 24 },
+  { label: "7d", hours: 24 * 7 }
+];
+
 export function MetricsPage() {
-  const [apiKey, setApiKey] = useState("");
-  const [value, setValue] = useState(430);
-  const [status, setStatus] = useState<string>();
-  const [summary, setSummary] = useState<Record<string, number>>({});
-  const [trends, setTrends] = useState<Array<Record<string, number | string>>>([]);
+  const [organizations, setOrganizations] = useState<OrganizationRecord[]>([]);
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [services, setServices] = useState<ServiceRecord[]>([]);
+  const [metrics, setMetrics] = useState<MetricRecord[]>([]);
+  const [aggregates, setAggregates] = useState<MetricAggregateRecord[]>([]);
+  const [filters, setFilters] = useState({
+    organizationId: "",
+    projectId: "",
+    serviceId: "",
+    environment: "",
+    metricName: "",
+    timeRange: "24h"
+  });
+  const [apiKey, setApiKey] = useState("");
+  const [metricValue, setMetricValue] = useState(430);
+  const [status, setStatus] = useState<string>();
+  const [loading, setLoading] = useState(false);
+
+  const selectedService = services.find((service) => service.id === filters.serviceId);
+  const selectedProject = projects.find((project) => project.id === filters.projectId);
+  const range = timeRanges.find((item) => item.label === filters.timeRange) ?? timeRanges[2];
+  const from = new Date(Date.now() - range.hours * 60 * 60 * 1000).toISOString();
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const params = {
+        organizationId: filters.organizationId,
+        projectId: filters.projectId,
+        serviceId: filters.serviceId,
+        environment: filters.environment,
+        metricName: filters.metricName,
+        from,
+        limit: 200
+      };
+      const [metricRows, aggregateRows] = await Promise.all([
+        fetchMetrics(params),
+        fetchMetricAggregates({ ...params, window: "1m", limit: 200 })
+      ]);
+      setMetrics(metricRows);
+      setAggregates(aggregateRows);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "failed to load metrics");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    Promise.all([fetchDashboardSummary(), fetchErrorTrends(24), fetchServices()])
-      .then(([summaryResult, trendResult, serviceResult]) => {
-        setSummary(summaryResult);
-        setTrends(trendResult);
-        setServices(serviceResult);
+    Promise.all([fetchOrganizations(), fetchProjects(), fetchServices()])
+      .then(([orgRows, projectRows, serviceRows]) => {
+        setOrganizations(orgRows);
+        setProjects(projectRows);
+        setServices(serviceRows);
       })
-      .catch((error) => setStatus(error instanceof Error ? error.message : "failed to load metrics"));
+      .catch((error) => setStatus(error instanceof Error ? error.message : "failed to load filters"));
   }, []);
 
-  async function submit(event: FormEvent) {
+  useEffect(() => {
+    load();
+  }, [filters.organizationId, filters.projectId, filters.serviceId, filters.environment, filters.metricName, filters.timeRange]);
+
+  const summary = useMemo(() => {
+    const throughput = metrics.filter((metric) => throughputMetrics.has(metric.metricName)).reduce((total, metric) => total + metric.value, 0);
+    const errors = metrics.filter((metric) => errorMetrics.has(metric.metricName)).reduce((total, metric) => total + metric.value, 0);
+    const p95 = metrics.filter((metric) => latencyMetrics.has(metric.metricName)).reduce((max, metric) => Math.max(max, metric.value), 0);
+    const routeCount = new Set(metrics.map((metric) => String(metric.labels?.route ?? "")).filter(Boolean)).size;
+    return {
+      throughput,
+      errorRate: throughput > 0 ? (errors / throughput) * 100 : 0,
+      p95,
+      routeCount
+    };
+  }, [metrics]);
+
+  async function submitCustom(event: FormEvent) {
     event.preventDefault();
     setStatus("sending");
     try {
-      const result = await ingestMetric(apiKey, {
-        serviceName: "checkout-api",
-        environment: "production",
-        metrics: {
-          requestCount: 1200,
-          errorCount: 31,
-          avgLatencyMs: value,
-          p95LatencyMs: Math.round(value * 1.65),
-          cpuUsage: 61.2,
-          memoryUsage: 74.4
-        },
+      const payload = {
+        projectKey: selectedProject?.projectKey ?? "loan-tracker",
+        serviceName: selectedService?.name ?? "loan-tracker-api",
+        serviceId: selectedService?.id,
+        environment: filters.environment || selectedService?.environment || selectedProject?.environment || "production",
+        metricName: filters.metricName || "http_request_duration_ms",
+        value: metricValue,
         timestamp: new Date().toISOString(),
-        labels: { route: "/api/checkout" }
-      });
+        labels: { route: "/api/transactions", method: "POST", statusCode: "200" }
+      };
+      const result = await ingestCustomMetric(apiKey, payload);
       setStatus(`${result.status} -> ${result.topic}`);
+      await load();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "failed");
     }
   }
 
-  const maxTrend = Math.max(...trends.map((item) => Number(item.incidents ?? 0)), 1);
+  async function submitBatch() {
+    setStatus("sending batch");
+    try {
+      const timestamp = new Date().toISOString();
+      const payload = {
+        projectKey: selectedProject?.projectKey ?? "loan-tracker",
+        serviceName: selectedService?.name ?? "loan-tracker-api",
+        serviceId: selectedService?.id,
+        environment: filters.environment || selectedService?.environment || selectedProject?.environment || "production",
+        metrics: [
+          { metricName: "http_requests_total", value: 1, timestamp, labels: { route: "/api/transactions", method: "POST", statusCode: "200" } },
+          { metricName: "http_request_duration_ms", value: metricValue, timestamp, labels: { route: "/api/transactions", method: "POST" } },
+          { metricName: "http_5xx_total", value: metricValue > 900 ? 1 : 0, timestamp, labels: { route: "/api/transactions" } }
+        ]
+      };
+      const result = await ingestBatchMetrics(apiKey, payload);
+      setStatus(`${result.status} -> ${result.topic} (${result.count})`);
+      await load();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "failed");
+    }
+  }
+
+  const maxAggregate = Math.max(...aggregates.slice(0, 24).map((item) => item.max), 1);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
-          <MetricRow label="Services" value={String(summary.servicesMonitored ?? services.length)} />
+          <MetricRow label="Throughput" value={String(Math.round(summary.throughput))} />
         </div>
         <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
-          <MetricRow label="Open Incidents" value={String(summary.openIncidents ?? 0)} />
+          <MetricRow label="Error Rate" value={`${summary.errorRate.toFixed(1)}%`} />
         </div>
         <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
-          <MetricRow label="Critical" value={String(summary.criticalIncidents ?? 0)} />
+          <MetricRow label="P95 Latency" value={`${Math.round(summary.p95)}ms`} />
         </div>
         <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
-          <MetricRow label="Alert Rules" value={String(summary.alertRulesEnabled ?? 0)} />
+          <MetricRow label="Routes" value={String(summary.routeCount)} />
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-        <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-white">Incident Trend</h2>
+      <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
             <Activity className="h-5 w-5 text-mint" />
+            <h2 className="text-base font-semibold text-white">Metrics Explorer</h2>
           </div>
-          <div className="flex h-56 items-end gap-2 rounded-lg border border-line bg-[#0d1419] p-4">
-            {trends.length === 0 ? (
-              <p className="self-center text-sm text-slate-400">No trend buckets yet</p>
+          <button onClick={load} className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-300">
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <select className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={filters.organizationId} onChange={(event) => setFilters((current) => ({ ...current, organizationId: event.target.value }))}>
+            <option value="">All organizations</option>
+            {organizations.map((org) => (
+              <option key={org.id} value={org.id}>{org.name}</option>
+            ))}
+          </select>
+          <select className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={filters.projectId} onChange={(event) => setFilters((current) => ({ ...current, projectId: event.target.value }))}>
+            <option value="">All projects</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>{project.name}</option>
+            ))}
+          </select>
+          <select className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={filters.serviceId} onChange={(event) => setFilters((current) => ({ ...current, serviceId: event.target.value }))}>
+            <option value="">All services</option>
+            {services.map((service) => (
+              <option key={service.id} value={service.id}>{service.name}</option>
+            ))}
+          </select>
+          <select className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={filters.environment} onChange={(event) => setFilters((current) => ({ ...current, environment: event.target.value }))}>
+            <option value="">All envs</option>
+            <option value="dev">dev</option>
+            <option value="staging">staging</option>
+            <option value="production">production</option>
+          </select>
+          <input className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={filters.metricName} onChange={(event) => setFilters((current) => ({ ...current, metricName: event.target.value }))} placeholder="metric name" />
+          <select className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={filters.timeRange} onChange={(event) => setFilters((current) => ({ ...current, timeRange: event.target.value }))}>
+            {timeRanges.map((item) => (
+              <option key={item.label} value={item.label}>{item.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[1fr_380px]">
+        <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-white">Aggregate Trend</h2>
+            <Layers className="h-5 w-5 text-sky-400" />
+          </div>
+          <div className="flex h-44 items-end gap-2 rounded-lg border border-line bg-[#0d1419] p-3">
+            {aggregates.length === 0 ? (
+              <p className="self-center text-sm text-slate-400">No aggregate buckets yet</p>
             ) : (
-              trends.map((item, index) => {
-                const value = Number(item.incidents ?? 0);
-                return (
-                  <div key={`${item.bucket}-${index}`} className="flex h-full flex-1 flex-col justify-end gap-2">
-                    <div
-                      title={`${item.bucket}: ${value}`}
-                      className="min-h-1 rounded-t bg-mint/80"
-                      style={{ height: `${Math.max(6, (value / maxTrend) * 100)}%` }}
-                    />
-                  </div>
-                );
-              })
+              aggregates.slice(0, 48).reverse().map((bucket) => (
+                <div key={bucket.id} className="flex h-full flex-1 items-end">
+                  <div className="w-full rounded-t bg-mint/80" title={`${bucket.metricName}: ${bucket.max}`} style={{ height: `${Math.max(6, (bucket.max / maxAggregate) * 100)}%` }} />
+                </div>
+              ))
             )}
           </div>
         </div>
 
-        <form onSubmit={submit} className="rounded-lg border border-line bg-panel p-5 shadow-panel">
+        <form onSubmit={submitCustom} className="rounded-lg border border-line bg-panel p-4 shadow-panel">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold text-white">Send Metric</h2>
-              <p className="text-sm text-slate-400">metrics.received</p>
-            </div>
-            <Gauge className="h-5 w-5 text-amber" aria-hidden="true" />
+            <h2 className="text-base font-semibold text-white">Send Metric</h2>
+            <Gauge className="h-5 w-5 text-amber" />
           </div>
           <div className="grid gap-3">
             <input className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" placeholder="API key" value={apiKey} onChange={(event) => setApiKey(event.target.value)} />
-            <input className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" type="number" value={value} onChange={(event) => setValue(Number(event.target.value))} />
-            <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber px-4 text-sm font-medium text-slate-950" type="submit">
-              <Send className="h-4 w-4" />
-              Send
-            </button>
+            <input className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" type="number" value={metricValue} onChange={(event) => setMetricValue(Number(event.target.value))} />
+            <div className="grid grid-cols-2 gap-2">
+              <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber px-3 text-sm font-medium text-slate-950" type="submit">
+                <Send className="h-4 w-4" />
+                Custom
+              </button>
+              <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-line bg-[#0d1419] px-3 text-sm font-medium text-white" type="button" onClick={submitBatch}>
+                <Layers className="h-4 w-4" />
+                Batch
+              </button>
+            </div>
           </div>
-          {status ? <p className="mt-3 text-sm text-slate-300">{status}</p> : null}
+          {status ? <p className="mt-3 break-words text-sm text-slate-300">{status}</p> : null}
         </form>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {services.map((service) => (
-          <div key={service.id} className="rounded-lg border border-line bg-[#0d1419] p-4">
-            <p className="truncate text-sm font-semibold text-white">{service.name}</p>
-            <p className="mt-1 text-xs text-slate-400">{service.healthStatus}</p>
-            <div className="mt-3 h-2 rounded bg-slate-800">
-              <div className={`h-2 rounded ${service.healthStatus === "healthy" ? "w-full bg-mint" : "w-2/3 bg-amber"}`} />
-            </div>
+      <div className="grid gap-5 xl:grid-cols-2">
+        <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <h2 className="mb-3 text-base font-semibold text-white">Aggregate Metrics</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-line text-slate-400">
+                <tr>
+                  <th className="py-2 pr-3">Metric</th>
+                  <th className="py-2 pr-3">Window</th>
+                  <th className="py-2 pr-3">Avg</th>
+                  <th className="py-2 pr-3">P95</th>
+                  <th className="py-2">Count</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line/40">
+                {aggregates.slice(0, 12).map((bucket) => (
+                  <tr key={bucket.id}>
+                    <td className="py-2 pr-3 font-mono text-slate-200">{bucket.metricName}</td>
+                    <td className="py-2 pr-3 text-slate-400">{bucket.window}</td>
+                    <td className="py-2 pr-3 text-slate-300">{bucket.avg.toFixed(1)}</td>
+                    <td className="py-2 pr-3 text-slate-300">{bucket.p95.toFixed(1)}</td>
+                    <td className="py-2 text-slate-300">{bucket.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))}
+        </div>
+
+        <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <h2 className="mb-3 text-base font-semibold text-white">Raw Metrics</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-line text-slate-400">
+                <tr>
+                  <th className="py-2 pr-3">Time</th>
+                  <th className="py-2 pr-3">Service</th>
+                  <th className="py-2 pr-3">Metric</th>
+                  <th className="py-2">Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line/40">
+                {metrics.slice(0, 14).map((metric) => (
+                  <tr key={metric.id}>
+                    <td className="py-2 pr-3 whitespace-nowrap text-slate-400">{new Date(metric.timestamp).toLocaleTimeString()}</td>
+                    <td className="py-2 pr-3 text-slate-300">{metric.serviceName}</td>
+                    <td className="py-2 pr-3 font-mono text-slate-200">{metric.metricName}</td>
+                    <td className="py-2 text-slate-300">{metric.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );

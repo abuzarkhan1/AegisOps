@@ -27,13 +27,24 @@ import (
 )
 
 type logPayload struct {
-	ServiceName string                 `json:"serviceName"`
-	Level       string                 `json:"level"`
-	Message     string                 `json:"message"`
-	Timestamp   string                 `json:"timestamp"`
-	TraceID     string                 `json:"traceId,omitempty"`
-	Environment string                 `json:"environment"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	OrganizationID string                 `json:"organizationId,omitempty"`
+	ProjectID      string                 `json:"projectId,omitempty"`
+	ProjectKey     string                 `json:"projectKey,omitempty"`
+	ServiceName    string                 `json:"serviceName"`
+	ServiceID      string                 `json:"serviceId,omitempty"`
+	Level          string                 `json:"level"`
+	Message        string                 `json:"message"`
+	Timestamp      string                 `json:"timestamp"`
+	TraceID        string                 `json:"traceId,omitempty"`
+	RequestID      string                 `json:"requestId,omitempty"`
+	SpanID         string                 `json:"spanId,omitempty"`
+	ParentSpanID   string                 `json:"parentSpanId,omitempty"`
+	Route          string                 `json:"route,omitempty"`
+	Method         string                 `json:"method,omitempty"`
+	StatusCode     *int                   `json:"statusCode,omitempty"`
+	DurationMs     *float64               `json:"durationMs,omitempty"`
+	Environment    string                 `json:"environment"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 }
 
 type batchLogPayload struct {
@@ -49,6 +60,14 @@ type apiKeyValidator struct {
 	redisAddr  string
 	coreAPIURL string
 	httpClient *http.Client
+}
+
+type apiKeyContext struct {
+	OrganizationID string
+	ProjectID      string
+	ProjectKey     string
+	ServiceID      string
+	ServiceName    string
 }
 
 var logsReceived = prometheus.NewCounterVec(
@@ -142,6 +161,12 @@ func logsHandler(logger *slog.Logger, writer *kafka.Writer, validator *apiKeyVal
 			return
 		}
 
+		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey)
+		if contextErr != nil {
+			logger.Error("API key context lookup failed", "error", contextErr)
+		}
+		payload = enrichLogContext(payload, keyContext)
+
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 		if err := publishLog(ctx, writer, payload); err != nil {
@@ -151,6 +176,9 @@ func logsHandler(logger *slog.Logger, writer *kafka.Writer, validator *apiKeyVal
 		}
 
 		logsReceived.WithLabelValues(payload.ServiceName, payload.Level, payload.Environment).Inc()
+		if err := evaluateLogAlertRules(r.Context(), validator.coreAPIURL, payload); err != nil {
+			logger.Error("Log alert rule evaluation failed", "error", err, "serviceName", payload.ServiceName)
+		}
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted", "topic": "logs.received"})
 	}
 }
@@ -194,10 +222,17 @@ func batchLogsHandler(logger *slog.Logger, writer *kafka.Writer, validator *apiK
 			}
 		}
 
+		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey)
+		if contextErr != nil {
+			logger.Error("API key context lookup failed", "error", contextErr)
+		}
+
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		messages := make([]kafka.Message, 0, len(payload.Logs))
-		for _, item := range payload.Logs {
+		for index, item := range payload.Logs {
+			payload.Logs[index] = enrichLogContext(item, keyContext)
+			item = payload.Logs[index]
 			message, err := logMessage(item)
 			if err != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to encode Kafka message"})
@@ -213,6 +248,9 @@ func batchLogsHandler(logger *slog.Logger, writer *kafka.Writer, validator *apiK
 
 		for _, item := range payload.Logs {
 			logsReceived.WithLabelValues(item.ServiceName, item.Level, item.Environment).Inc()
+			if err := evaluateLogAlertRules(r.Context(), validator.coreAPIURL, item); err != nil {
+				logger.Error("Log alert rule evaluation failed", "error", err, "serviceName", item.ServiceName)
+			}
 		}
 		writeJSON(w, http.StatusAccepted, map[string]interface{}{"status": "accepted", "topic": "logs.received", "count": len(payload.Logs)})
 	}
@@ -241,16 +279,28 @@ func publishLog(ctx context.Context, writer *kafka.Writer, payload logPayload) e
 }
 
 func logMessage(payload logPayload) (kafka.Message, error) {
+	metadata := enrichLogMetadata(payload)
 	body, err := json.Marshal(map[string]interface{}{
-		"eventType":   "logs.received",
-		"serviceName": payload.ServiceName,
-		"level":       payload.Level,
-		"message":     payload.Message,
-		"timestamp":   payload.Timestamp,
-		"traceId":     payload.TraceID,
-		"environment": payload.Environment,
-		"metadata":    payload.Metadata,
-		"receivedAt":  time.Now().UTC().Format(time.RFC3339Nano),
+		"eventType":      "logs.received",
+		"organizationId": payload.OrganizationID,
+		"projectId":      payload.ProjectID,
+		"projectKey":     payload.ProjectKey,
+		"serviceName":    payload.ServiceName,
+		"serviceId":      payload.ServiceID,
+		"level":          payload.Level,
+		"message":        payload.Message,
+		"timestamp":      payload.Timestamp,
+		"traceId":        payload.TraceID,
+		"requestId":      payload.RequestID,
+		"spanId":         payload.SpanID,
+		"parentSpanId":   payload.ParentSpanID,
+		"route":          payload.Route,
+		"method":         payload.Method,
+		"statusCode":     payload.StatusCode,
+		"durationMs":     payload.DurationMs,
+		"environment":    payload.Environment,
+		"metadata":       metadata,
+		"receivedAt":     time.Now().UTC().Format(time.RFC3339Nano),
 	})
 	if err != nil {
 		return kafka.Message{}, err
@@ -279,10 +329,14 @@ func healthHandler(serviceName string, brokers []string, redisAddr string, coreA
 		}
 
 		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"status":  status,
-			"service": serviceName,
-			"topic":   "logs.received",
-			"checks":  checks,
+			"status":       status,
+			"healthStatus": degradedStatus(status),
+			"service":      serviceName,
+			"timestamp":    time.Now().UTC().Format(time.RFC3339Nano),
+			"mode":         "local",
+			"topic":        "logs.received",
+			"dependencies": dependencyStatuses(checks, map[string]string{"postgres": "not_required", "rabbitmq": "not_required"}),
+			"checks":       checks,
 		})
 	}
 }
@@ -336,6 +390,138 @@ func (validator *apiKeyValidator) validate(ctx context.Context, rawKey string) (
 		return true, "valid", nil
 	}
 	return false, "invalid API key", nil
+}
+
+func (validator *apiKeyValidator) resolveContext(ctx context.Context, rawKey string) (apiKeyContext, error) {
+	rawKey = strings.TrimSpace(rawKey)
+	if rawKey == "" {
+		return apiKeyContext{}, errors.New("X-API-Key header is required")
+	}
+
+	body, err := json.Marshal(map[string]string{"apiKey": rawKey})
+	if err != nil {
+		return apiKeyContext{}, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, validator.coreAPIURL+"/api/api-keys/validate", bytes.NewReader(body))
+	if err != nil {
+		return apiKeyContext{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := validator.httpClient.Do(req)
+	if err != nil {
+		return apiKeyContext{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 500 {
+		return apiKeyContext{}, fmt.Errorf("core api returned %d", resp.StatusCode)
+	}
+
+	var validation struct {
+		Valid  bool `json:"valid"`
+		APIKey struct {
+			OrganizationID string `json:"organizationId"`
+			ProjectID      string `json:"projectId"`
+			ProjectKey     string `json:"projectKey"`
+			ServiceID      string `json:"serviceId"`
+			ServiceName    string `json:"serviceName"`
+		} `json:"apiKey"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&validation); err != nil {
+		return apiKeyContext{}, err
+	}
+	if !validation.Valid {
+		return apiKeyContext{}, errors.New("invalid API key")
+	}
+	return apiKeyContext{
+		OrganizationID: validation.APIKey.OrganizationID,
+		ProjectID:      validation.APIKey.ProjectID,
+		ProjectKey:     validation.APIKey.ProjectKey,
+		ServiceID:      validation.APIKey.ServiceID,
+		ServiceName:    validation.APIKey.ServiceName,
+	}, nil
+}
+
+func evaluateLogAlertRules(ctx context.Context, coreAPIURL string, payload logPayload) error {
+	if strings.TrimSpace(payload.OrganizationID) == "" {
+		return nil
+	}
+	requestBody := map[string]interface{}{
+		"organizationId": payload.OrganizationID,
+		"projectId":      payload.ProjectID,
+		"serviceId":      payload.ServiceID,
+		"serviceName":    payload.ServiceName,
+		"environment":    payload.Environment,
+		"level":          payload.Level,
+		"message":        payload.Message,
+		"traceId":        payload.TraceID,
+		"requestId":      payload.RequestID,
+		"route":          payload.Route,
+		"method":         payload.Method,
+		"timestamp":      payload.Timestamp,
+		"metadata":       enrichLogMetadata(payload),
+	}
+	if payload.StatusCode != nil {
+		requestBody["statusCode"] = *payload.StatusCode
+	}
+	body, err := json.Marshal(requestBody)
+	if err != nil {
+		return err
+	}
+	evalCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(evalCtx, http.MethodPost, strings.TrimRight(coreAPIURL, "/")+"/api/alert-rules/evaluate-log", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		responseBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("core api log alert evaluation returned %d: %s", resp.StatusCode, strings.TrimSpace(string(responseBody)))
+	}
+	return nil
+}
+
+func enrichLogContext(payload logPayload, keyContext apiKeyContext) logPayload {
+	payload.OrganizationID = firstNonEmpty(payload.OrganizationID, keyContext.OrganizationID)
+	payload.ProjectID = firstNonEmpty(payload.ProjectID, keyContext.ProjectID)
+	payload.ProjectKey = firstNonEmpty(payload.ProjectKey, keyContext.ProjectKey)
+	payload.ServiceID = firstNonEmpty(payload.ServiceID, keyContext.ServiceID)
+	payload.ServiceName = firstNonEmpty(payload.ServiceName, keyContext.ServiceName)
+	return payload
+}
+
+func enrichLogMetadata(payload logPayload) map[string]interface{} {
+	metadata := make(map[string]interface{})
+	for key, value := range payload.Metadata {
+		metadata[key] = value
+	}
+	if payload.RequestID != "" {
+		metadata["requestId"] = payload.RequestID
+	}
+	if payload.SpanID != "" {
+		metadata["spanId"] = payload.SpanID
+	}
+	if payload.ParentSpanID != "" {
+		metadata["parentSpanId"] = payload.ParentSpanID
+	}
+	if payload.Route != "" {
+		metadata["route"] = payload.Route
+	}
+	if payload.Method != "" {
+		metadata["method"] = payload.Method
+	}
+	if payload.StatusCode != nil {
+		metadata["statusCode"] = *payload.StatusCode
+	}
+	if payload.DurationMs != nil {
+		metadata["durationMs"] = *payload.DurationMs
+	}
+	return metadata
 }
 
 func redisGet(ctx context.Context, addr string, key string) (string, error) {
@@ -514,6 +700,38 @@ func splitCSV(value string) []string {
 		trimmed := strings.TrimSpace(part)
 		if trimmed != "" {
 			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func degradedStatus(status string) string {
+	if status == "ok" {
+		return "healthy"
+	}
+	return "degraded"
+}
+
+func dependencyStatuses(checks map[string]checkResult, defaults map[string]string) map[string]string {
+	out := make(map[string]string, len(checks)+len(defaults))
+	for key, value := range defaults {
+		out[key] = value
+	}
+	for key, value := range checks {
+		if value.Status == "ok" {
+			out[key] = "healthy"
+		} else {
+			out[key] = "degraded"
 		}
 	}
 	return out

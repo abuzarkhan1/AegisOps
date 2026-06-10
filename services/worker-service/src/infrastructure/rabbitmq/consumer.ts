@@ -97,14 +97,15 @@ export class RabbitMqTaskConsumer {
     // 3. Fetch recent logs from database (30 mins window before incident started)
     const logsRes = await db.query(
       `
-      SELECT service_name AS "serviceName", level, message, timestamp, metadata
+      SELECT service_name AS "serviceName", level, message, trace_id AS "traceId", request_id AS "requestId", route, status_code AS "statusCode", duration_ms AS "durationMs", timestamp, metadata
       FROM logs
-      WHERE service_name = $1
-        AND timestamp BETWEEN $2::timestamptz - interval '30 minutes' AND $2::timestamptz
+      WHERE (($1::uuid IS NOT NULL AND service_id = $1)
+         OR ($1::uuid IS NULL AND service_name = $2))
+        AND timestamp BETWEEN $3::timestamptz - interval '30 minutes' AND $3::timestamptz
       ORDER BY timestamp DESC
       LIMIT 100
       `,
-      [serviceName, incident.created_at]
+      [incident.service_id, serviceName, incident.created_at]
     );
     const logs = logsRes.rows;
 
@@ -139,19 +140,39 @@ export class RabbitMqTaskConsumer {
       }
     }
 
-    // 6. Query Prometheus or generate fallback mock metrics
-    let metricsSummary = { errorRate: 0.1, p95LatencyMs: 120 };
-    try {
-      const promRes = await fetch(`http://localhost:9090/api/v1/query?query=sum(rate(service_errors_total{service_name="${serviceName}"}[5m]))`);
-      if (promRes.ok) {
-        // Simple mock differentials if Prometheus is present but empty, or real data
-        metricsSummary = { errorRate: 9.4, p95LatencyMs: 1450 };
-      } else {
-        metricsSummary = { errorRate: 8.7, p95LatencyMs: 1120 };
-      }
-    } catch {
-      metricsSummary = { errorRate: 7.8, p95LatencyMs: 980 }; // Failover defaults
-    }
+    // 6. Fetch recent metrics from PostgreSQL as AI evidence
+    const metricsRes = await db.query(
+      `
+      SELECT metric_name AS "metricName",
+             AVG(value)::float AS avg,
+             MAX(value)::float AS max,
+             SUM(value)::float AS sum,
+             COUNT(*)::int AS samples
+      FROM metrics
+      WHERE (($1::uuid IS NOT NULL AND service_id = $1) OR ($1::uuid IS NULL AND service_name = $2))
+        AND timestamp BETWEEN $3::timestamptz - interval '30 minutes' AND $3::timestamptz
+      GROUP BY metric_name
+      `,
+      [incident.service_id, serviceName, incident.created_at]
+    );
+    const metricRows = metricsRes.rows;
+    const sumMetric = (names: string[]) =>
+      metricRows
+        .filter((row) => names.includes(row.metricName))
+        .reduce((total, row) => total + Number(row.sum ?? 0), 0);
+    const maxMetric = (names: string[]) =>
+      metricRows
+        .filter((row) => names.includes(row.metricName))
+        .reduce((current, row) => Math.max(current, Number(row.max ?? 0)), 0);
+    const requests = sumMetric(["http_requests_total", "request_count", "requestCount"]);
+    const errors = sumMetric(["http_errors_total", "http_5xx_total", "error_count", "errorCount", "exceptions_total"]);
+    const metricsSummary = {
+      errorRate: requests > 0 ? Number(((errors / requests) * 100).toFixed(2)) : 0,
+      p95LatencyMs: maxMetric(["http_request_duration_p95", "p95_latency", "p95LatencyMs", "http_request_duration_ms"]),
+      throughput: requests,
+      samples: metricRows.reduce((total, row) => total + Number(row.samples ?? 0), 0),
+      metrics: metricRows
+    };
 
     // 7. Request AI Analysis from ai-rca-service
     const requestBody = {

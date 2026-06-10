@@ -37,8 +37,16 @@ public class NotificationApplicationService {
 
     return Map.of(
       "status", "ok",
+      "healthStatus", "healthy",
       "service", properties.serviceName(),
       "timestamp", Instant.now().toString(),
+      "mode", "local",
+      "dependencies", Map.of(
+        "postgres", "configured",
+        "redis", "configured",
+        "kafka", "not_required",
+        "rabbitmq", "configured"
+      ),
       "checks", checks
     );
   }
