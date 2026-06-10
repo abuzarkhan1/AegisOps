@@ -1,0 +1,16 @@
+.DS_Store
+.env
+node_modules/
+dist/
+build/
+target/
+.venv/
+__pycache__/
+*.pyc
+coverage/
+.idea/
+.vscode/
+*.log
+*.tsbuildinfo
+apps/web-dashboard/vite.config.js
+apps/web-dashboard/vite.config.d.ts

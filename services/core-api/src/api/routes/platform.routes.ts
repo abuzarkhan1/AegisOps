@@ -1,0 +1,26 @@
+import { Router } from "express";
+import { apiKeyRouter } from "../../modules/api-keys/api-key.routes";
+import { auditLogRouter } from "../../modules/audit-logs/audit-log.routes";
+import { authRouter } from "../../modules/auth/auth.routes";
+import { alertRuleRouter } from "../../modules/alert-rules/alert-rule.routes";
+import { dashboardRouter } from "../../modules/dashboard/dashboard.routes";
+import { incidentRouter } from "../../modules/incidents/incident.routes";
+import { organizationRouter } from "../../modules/organizations/organization.routes";
+import { projectRouter } from "../../modules/projects/project.routes";
+import { serviceRouter } from "../../modules/services/service.routes";
+import { systemRouter } from "../../modules/system/system.routes";
+import { logsRouter } from "../../modules/system/logs.routes";
+
+export const platformRouter = Router();
+
+platformRouter.use("/api/auth", authRouter);
+platformRouter.use("/api/organizations", organizationRouter);
+platformRouter.use("/api/projects", projectRouter);
+platformRouter.use("/api", serviceRouter);
+platformRouter.use("/api", apiKeyRouter);
+platformRouter.use("/api/incidents", incidentRouter);
+platformRouter.use("/api/alert-rules", alertRuleRouter);
+platformRouter.use("/api/dashboard", dashboardRouter);
+platformRouter.use("/api/audit-logs", auditLogRouter);
+platformRouter.use("/api", systemRouter);
+platformRouter.use("/api", logsRouter);
