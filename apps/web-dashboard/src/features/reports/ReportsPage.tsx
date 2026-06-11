@@ -27,6 +27,7 @@ const numberValue = (value: unknown) => (typeof value === "number" && Number.isF
 const formatNumber = (value: unknown, suffix = "") => `${Math.round(numberValue(value)).toLocaleString()}${suffix}`;
 const formatPercent = (value: unknown) => `${numberValue(value).toFixed(1)}%`;
 const formatDate = (value?: string) => (value ? new Date(value).toLocaleString() : "No date");
+const safeFilename = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "report";
 
 export function ReportsPage() {
   const [organizations, setOrganizations] = useState<OrganizationRecord[]>([]);
@@ -119,6 +120,19 @@ export function ReportsPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function downloadReport(format: "json" | "csv") {
+    if (!selectedReport) return;
+    const filename = safeFilename(`${selectedReport.title}-${selectedReport.createdAt}`);
+    const content = format === "json" ? JSON.stringify(selectedReport, null, 2) : reportToCsv(selectedReport);
+    const blob = new Blob([content], { type: format === "json" ? "application/json" : "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${filename}.${format}`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -218,12 +232,36 @@ export function ReportsPage() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                {["PDF", "CSV", "Email", "Schedule"].map((item) => (
-                  <button key={item} type="button" title={`${item} placeholder`} className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs text-slate-300">
-                    <Download className="h-3.5 w-3.5" />
-                    {item}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  title="Download JSON"
+                  disabled={!selectedReport}
+                  onClick={() => downloadReport("json")}
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs text-slate-300 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  JSON
+                </button>
+                <button
+                  type="button"
+                  title="Download CSV"
+                  disabled={!selectedReport}
+                  onClick={() => downloadReport("csv")}
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs text-slate-300 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  CSV
+                </button>
+                <button
+                  type="button"
+                  title="Print report"
+                  disabled={!selectedReport}
+                  onClick={() => window.print()}
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs text-slate-300 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Print
+                </button>
               </div>
             </div>
 
@@ -355,4 +393,23 @@ export function ReportsPage() {
       </div>
     </div>
   );
+}
+
+function reportToCsv(report: ReportRecord) {
+  const rows: string[][] = [
+    ["field", "value"],
+    ["id", report.id],
+    ["title", report.title],
+    ["type", report.reportType],
+    ["status", report.status],
+    ["periodStart", report.periodStart],
+    ["periodEnd", report.periodEnd]
+  ];
+  const summary = report.payload.summary ?? {};
+  for (const [key, value] of Object.entries(summary)) rows.push([`summary.${key}`, String(value)]);
+  const telemetrySummary = report.payload.telemetrySummary ?? {};
+  for (const [key, value] of Object.entries(telemetrySummary)) rows.push([`telemetry.${key}`, String(value)]);
+  const incidentSummary = report.payload.incidentSummary ?? {};
+  for (const [key, value] of Object.entries(incidentSummary)) rows.push([`incidents.${key}`, String(value)]);
+  return rows.map((row) => row.map((cell) => `"${cell.replace(/"/g, "\"\"")}"`).join(",")).join("\n");
 }

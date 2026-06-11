@@ -17,7 +17,9 @@ export class RabbitMqTaskConsumer {
 
   async start() {
     this.connection = await amqp.connect(env.RABBITMQ_URL);
+    this.bindConnectionHandlers(this.connection);
     this.channel = await this.connection.createChannel();
+    this.bindChannelHandlers(this.channel);
 
     await this.channel.prefetch(1);
 
@@ -52,6 +54,33 @@ export class RabbitMqTaskConsumer {
   async stop() {
     await this.channel?.close().catch(() => undefined);
     await this.connection?.close().catch(() => undefined);
+    this.channel = undefined;
+    this.connection = undefined;
+  }
+
+  private bindConnectionHandlers(connection: amqp.Connection) {
+    (connection as any).on("error", (error: Error) => {
+      logger.error({ error }, "RabbitMQ consumer connection error");
+    });
+    (connection as any).on("close", () => {
+      logger.warn("RabbitMQ consumer connection closed");
+      if (this.connection === connection) {
+        this.connection = undefined;
+        this.channel = undefined;
+      }
+    });
+  }
+
+  private bindChannelHandlers(channel: amqp.Channel) {
+    (channel as any).on("error", (error: Error) => {
+      logger.error({ error }, "RabbitMQ consumer channel error");
+    });
+    (channel as any).on("close", () => {
+      logger.warn("RabbitMQ consumer channel closed");
+      if (this.channel === channel) {
+        this.channel = undefined;
+      }
+    });
   }
 
   private async processTask(taskType: string, payload: AegisOpsEvent) {

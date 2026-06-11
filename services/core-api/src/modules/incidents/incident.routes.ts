@@ -12,6 +12,8 @@ export const incidentRouter = Router();
 
 import { clearDashboardCache, clearProjectCache, clearServiceCache } from "../../utils/cacheInvalidation";
 
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 async function invalidateIncidentCaches(orgId?: string, incidentId?: string, projectId?: string, serviceId?: string) {
   try {
     await cache.delete(redisKeyPatterns.orgRecentIncidents("default"));
@@ -405,18 +407,21 @@ incidentRouter.post(
   asyncHandler(async (req, res) => {
     const incident = await platformRepository.getIncident(req.params.incidentId);
     if (!incident) throw notFound("Incident");
+    const rawSourceId = optionalString(req.body, "sourceId");
+    const payload = optionalObject(req.body, "payload") ?? {};
+    const evidencePayload = rawSourceId && !uuidPattern.test(rawSourceId) ? { ...payload, sourceId: rawSourceId } : payload;
     const evidence = await platformRepository.createIncidentEvidence({
       incidentId: incident.id,
       evidenceType: requiredString(req.body, "evidenceType"),
-      sourceId: optionalString(req.body, "sourceId"),
+      sourceId: rawSourceId && uuidPattern.test(rawSourceId) ? rawSourceId : undefined,
       title: optionalString(req.body, "title"),
-      payload: optionalObject(req.body, "payload")
+      payload: evidencePayload
     });
     await platformRepository.createIncidentTimelineEvent({
       incidentId: incident.id,
       eventType: "evidence_added",
       message: `Evidence added: ${evidence.title ?? evidence.evidenceType}`,
-      metadata: { evidenceId: evidence.id, evidenceType: evidence.evidenceType, sourceId: evidence.sourceId }
+      metadata: { evidenceId: evidence.id, evidenceType: evidence.evidenceType, sourceId: rawSourceId }
     });
     await platformRepository.audit({
       organizationId: incident.organizationId,

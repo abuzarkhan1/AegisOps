@@ -1,5 +1,30 @@
 import { coreApiUrl, gatewayUrl } from "../../app/config";
 
+let accessTokenProvider: (() => string | undefined) | undefined;
+let unauthorizedHandler: (() => void) | undefined;
+
+export function configureApiAuth(options: { getAccessToken?: () => string | undefined; onUnauthorized?: () => void }) {
+  accessTokenProvider = options.getAccessToken;
+  unauthorizedHandler = options.onUnauthorized;
+}
+
+export type AuthUserRecord = {
+  id: string;
+  email: string;
+  name: string;
+  role: "owner" | "admin" | "engineer" | "viewer" | string;
+  status: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+export type AuthSessionRecord = {
+  user: AuthUserRecord;
+  accessToken: string;
+  refreshToken?: string;
+  organization?: OrganizationRecord;
+};
+
 export type ServiceRecord = {
   id: string;
   organizationId?: string;
@@ -152,6 +177,25 @@ export type NotificationHistoryRecord = {
   createdAt: string;
 };
 
+export type NotificationSettingRecord = {
+  id?: string;
+  organizationId: string;
+  provider: string;
+  destination: string;
+  enabled: boolean;
+  createdAt?: string;
+};
+
+export type EscalationPolicyRecord = {
+  id?: string;
+  organizationId: string;
+  name: string;
+  severity: string;
+  providers: string[];
+  enabled: boolean;
+  createdAt?: string;
+};
+
 export type AuditLogRecord = {
   id: string;
   organizationId?: string;
@@ -280,16 +324,31 @@ export type ServiceDetailSummary = {
   lastMetricAt?: string;
 };
 
+function toQuery(params?: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams();
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") {
+        query.set(key, String(value));
+      }
+    }
+  }
+  return query.toString();
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  const authToken = accessTokenProvider?.();
+  const headers = new Headers(init?.headers ?? {});
+  if (!headers.has("content-type")) headers.set("content-type", "application/json");
+  if (authToken && !headers.has("authorization")) headers.set("authorization", `Bearer ${authToken}`);
+
   const response = await fetch(url, {
     ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers ?? {})
-    }
+    headers
   });
   if (!response.ok) {
     const body = await response.text();
+    if (response.status === 401) unauthorizedHandler?.();
     throw new Error(body || `Request failed with ${response.status}`);
   }
   if (response.status === 204) return undefined as T;
@@ -297,19 +356,68 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return (body ? JSON.parse(body) : undefined) as T;
 }
 
-export async function fetchServices() {
-  const data = await request<{ services: ServiceRecord[] }>(`${coreApiUrl}/api/dashboard/service-health`);
+export async function login(payload: { email: string; password: string }) {
+  return request<AuthSessionRecord>(`${coreApiUrl}/api/auth/login`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function register(payload: { email: string; password: string; name?: string; organizationName?: string }) {
+  return request<AuthSessionRecord>(`${coreApiUrl}/api/auth/register`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function refreshSession(refreshToken?: string) {
+  return request<Partial<AuthSessionRecord> & { user: AuthUserRecord; accessToken: string }>(`${coreApiUrl}/api/auth/refresh`, {
+    method: "POST",
+    body: JSON.stringify({ refreshToken })
+  });
+}
+
+export async function logout(refreshToken?: string) {
+  return request<void>(`${coreApiUrl}/api/auth/logout`, {
+    method: "POST",
+    body: JSON.stringify({ refreshToken })
+  });
+}
+
+export async function fetchCurrentUser() {
+  const data = await request<{ user: AuthUserRecord }>(`${coreApiUrl}/api/auth/me`);
+  return data.user;
+}
+
+export async function fetchServices(params?: Record<string, string | number | undefined>) {
+  const query = toQuery(params);
+  const data = await request<{ services: ServiceRecord[] }>(`${coreApiUrl}/api/dashboard/service-health${query ? `?${query}` : ""}`);
   return data.services;
 }
 
-export async function fetchIncidents() {
-  const data = await request<{ incidents: IncidentRecord[] }>(`${coreApiUrl}/api/incidents`);
+export async function fetchIncidents(params?: Record<string, string | number | undefined>) {
+  const query = toQuery(params);
+  const data = await request<{ incidents: IncidentRecord[] }>(`${coreApiUrl}/api/incidents${query ? `?${query}` : ""}`);
   return data.incidents;
 }
 
 export async function fetchOrganizations() {
   const data = await request<{ organizations: OrganizationRecord[] }>(`${coreApiUrl}/api/organizations`);
   return data.organizations;
+}
+
+export async function createOrganization(payload: Record<string, unknown>) {
+  return request<{ organization: OrganizationRecord }>(`${coreApiUrl}/api/organizations`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateOrganization(orgId: string, payload: Record<string, unknown>) {
+  return request<{ organization: OrganizationRecord }>(`${coreApiUrl}/api/organizations/${orgId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function fetchProjects(params?: Record<string, string>) {
@@ -343,6 +451,19 @@ export async function createProject(payload: Record<string, unknown>) {
   });
 }
 
+export async function updateProject(projectId: string, payload: Record<string, unknown>) {
+  return request<{ project: ProjectRecord }>(`${coreApiUrl}/api/projects/${projectId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteProject(projectId: string) {
+  return request<void>(`${coreApiUrl}/api/projects/${projectId}`, {
+    method: "DELETE"
+  });
+}
+
 export async function createService(projectId: string, payload: Record<string, unknown>) {
   return request<{ service: ServiceRecord }>(`${coreApiUrl}/api/v1/projects/${projectId}/services`, {
     method: "POST",
@@ -358,6 +479,19 @@ export async function fetchProjectServices(projectId: string) {
 export async function fetchService(serviceId: string) {
   const data = await request<{ service: ServiceRecord }>(`${coreApiUrl}/api/services/${serviceId}`);
   return data.service;
+}
+
+export async function updateService(serviceId: string, payload: Record<string, unknown>) {
+  return request<{ service: ServiceRecord }>(`${coreApiUrl}/api/services/${serviceId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteService(serviceId: string) {
+  return request<void>(`${coreApiUrl}/api/services/${serviceId}`, {
+    method: "DELETE"
+  });
 }
 
 export async function fetchServiceDetailSummary(serviceId: string, params?: Record<string, string | number | undefined>) {
@@ -440,6 +574,19 @@ export async function inviteTeamMember(orgId: string, payload: Record<string, un
   });
 }
 
+export async function updateTeamMemberRole(orgId: string, userId: string, role: string) {
+  return request<Record<string, unknown>>(`${coreApiUrl}/api/organizations/${orgId}/users/${userId}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role })
+  });
+}
+
+export async function removeTeamMember(orgId: string, userId: string) {
+  return request<void>(`${coreApiUrl}/api/organizations/${orgId}/users/${userId}`, {
+    method: "DELETE"
+  });
+}
+
 export async function fetchAlertRules(params?: Record<string, string>) {
   const query = new URLSearchParams(params ?? {}).toString();
   const data = await request<{ alertRules: AlertRuleRecord[] }>(`${coreApiUrl}/api/alert-rules${query ? `?${query}` : ""}`);
@@ -460,13 +607,35 @@ export async function evaluateAlertRules(payload: Record<string, unknown>) {
   });
 }
 
-export async function fetchDashboardSummary() {
-  const data = await request<{ summary: Record<string, number> }>(`${coreApiUrl}/api/dashboard/summary`);
+export async function evaluateLogAlertRules(payload: Record<string, unknown>) {
+  return request<{ evaluated: number; breached: number; results: any[] }>(`${coreApiUrl}/api/alert-rules/evaluate-log`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateAlertRule(ruleId: string, payload: Record<string, unknown>) {
+  return request<{ alertRule: AlertRuleRecord }>(`${coreApiUrl}/api/alert-rules/${ruleId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteAlertRule(ruleId: string) {
+  return request<void>(`${coreApiUrl}/api/alert-rules/${ruleId}`, {
+    method: "DELETE"
+  });
+}
+
+export async function fetchDashboardSummary(params?: Record<string, string | number | undefined>) {
+  const query = toQuery(params);
+  const data = await request<{ summary: Record<string, number> }>(`${coreApiUrl}/api/dashboard/summary${query ? `?${query}` : ""}`);
   return data.summary;
 }
 
-export async function fetchErrorTrends(hours = 24) {
-  const data = await request<{ buckets: Array<Record<string, number | string>> }>(`${coreApiUrl}/api/dashboard/error-trends?hours=${hours}`);
+export async function fetchErrorTrends(hours = 24, params?: Record<string, string | number | undefined>) {
+  const query = toQuery({ hours, ...(params ?? {}) });
+  const data = await request<{ buckets: Array<Record<string, number | string>> }>(`${coreApiUrl}/api/dashboard/error-trends?${query}`);
   return data.buckets;
 }
 
@@ -531,9 +700,19 @@ export async function summarizeLogs(payload: Record<string, unknown>) {
   });
 }
 
-export async function fetchNotificationHistory() {
-  const data = await request<{ history: NotificationHistoryRecord[] }>(`${gatewayUrl}/notify/history`);
+export async function fetchNotificationHistory(orgId?: string) {
+  const data = await request<{ history: NotificationHistoryRecord[] }>(`${gatewayUrl}/notify/history${orgId ? `/${orgId}` : ""}`);
   return data.history;
+}
+
+export async function fetchNotificationSettings(orgId?: string) {
+  const data = await request<{ settings: NotificationSettingRecord[] }>(`${gatewayUrl}/notify/settings${orgId ? `/${orgId}` : ""}`);
+  return data.settings;
+}
+
+export async function fetchEscalationPolicies(orgId?: string) {
+  const data = await request<{ policies: EscalationPolicyRecord[] }>(`${gatewayUrl}/notify/escalation-policies${orgId ? `/${orgId}` : ""}`);
+  return data.policies;
 }
 
 export async function fetchAuditLogs(params?: Record<string, string | number | undefined>) {
@@ -549,6 +728,13 @@ export async function fetchAuditLogs(params?: Record<string, string | number | u
 
 export async function saveNotificationSetting(orgId: string, payload: Record<string, unknown>) {
   return request<Record<string, unknown>>(`${gatewayUrl}/notify/settings/${orgId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function saveEscalationPolicy(orgId: string, payload: Record<string, unknown>) {
+  return request<Record<string, unknown>>(`${gatewayUrl}/notify/escalation-policies/${orgId}`, {
     method: "PATCH",
     body: JSON.stringify(payload)
   });
@@ -634,7 +820,7 @@ export async function addIncidentEvidence(incidentId: string, payload: Record<st
 }
 
 export async function fetchDeploymentImpact(deploymentId: string) {
-  const data = await request<{ impact: any }>(`${gatewayUrl}/deployments/deployments/${deploymentId}/impact`);
+  const data = await request<{ impact: any }>(`${gatewayUrl}/deployments/${deploymentId}/impact`);
   return data.impact;
 }
 

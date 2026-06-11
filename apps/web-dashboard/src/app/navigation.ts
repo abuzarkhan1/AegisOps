@@ -29,7 +29,6 @@ export type NavigationItem = {
   icon: LucideIcon;
   path?: string;
   group?: string;
-  planned?: boolean;
 };
 
 export type NavigationGroup = {
@@ -50,34 +49,34 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { label: "Projects", icon: FolderKanban },
       { label: "Services", icon: ListTree },
-      { label: "Service Catalog", icon: LayoutPanelTop, planned: true },
+      { label: "Service Catalog", icon: LayoutPanelTop },
       { label: "Logs", icon: TerminalSquare },
       { label: "Metrics", icon: Gauge },
-      { label: "Dashboards", icon: BarChart3, planned: true }
+      { label: "Dashboards", icon: BarChart3 }
     ]
   },
   {
     label: "Reliability",
     items: [
-      { label: "Issues", icon: ShieldAlert, planned: true },
+      { label: "Issues", icon: ShieldAlert },
       { label: "Incidents", icon: Siren },
       { label: "Alert Rules", icon: ActivitySquare },
-      { label: "SLOs", icon: Waves, planned: true },
-      { label: "Synthetics", icon: Radar, planned: true }
+      { label: "SLOs", icon: Waves },
+      { label: "Synthetics", icon: Radar }
     ]
   },
   {
     label: "AI",
     items: [
       { label: "AI RCA", icon: BrainCircuit },
-      { label: "AI Investigations", icon: SearchCode, planned: true }
+      { label: "AI Investigations", icon: SearchCode }
     ]
   },
   {
     label: "Delivery",
     items: [
       { label: "Deployments", icon: GitBranch },
-      { label: "Releases", icon: Rocket, planned: true }
+      { label: "Releases", icon: Rocket }
     ]
   },
   {
@@ -101,5 +100,3 @@ export const navPath = (label: string, path?: string) =>
   path ?? (label === "Overview" ? "/" : `/${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`);
 
 export const navByPath = Object.fromEntries(navigationItems.map((item) => [navPath(item.label, item.path), item.label]));
-
-export const plannedNavigationLabels = new Set(navigationItems.filter((item) => item.planned).map((item) => item.label));

@@ -24,13 +24,28 @@ const services = [
   ["worker", "http://localhost:4020/health"]
 ];
 
+let coreAccessToken = "";
+
+function hasHeader(headers, name) {
+  return Object.keys(headers ?? {}).some((key) => key.toLowerCase() === name.toLowerCase());
+}
+
 async function request(url, options = {}) {
+  const headers = {
+    "content-type": "application/json",
+    ...(options.headers ?? {})
+  };
+  const isCorePlatformRequest = String(url).startsWith(`${core}/api/`);
+  const isPublicCoreRequest =
+    String(url).startsWith(`${core}/api/auth/`) ||
+    String(url).startsWith(`${core}/api/api-keys/validate`);
+  if (coreAccessToken && isCorePlatformRequest && !isPublicCoreRequest && !hasHeader(headers, "authorization")) {
+    headers.Authorization = `Bearer ${coreAccessToken}`;
+  }
+
   const response = await fetch(url, {
     ...options,
-    headers: {
-      "content-type": "application/json",
-      ...(options.headers ?? {})
-    }
+    headers
   });
   const text = await response.text();
   let body = {};
@@ -145,6 +160,7 @@ async function runOptionalExampleApp(env) {
     body: JSON.stringify({ email, password })
   });
   assert(login.accessToken, "login did not return an access token");
+  coreAccessToken = login.accessToken;
   const organizationId = registration.organization.id;
   console.log("ok auth register/login");
 

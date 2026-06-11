@@ -364,11 +364,7 @@ AEGISOPS_ENVIRONMENT=${environment}`
     if (frameworkTab === "Generic HTTP") {
       return [curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n");
     }
-    return `${frameworkTab} SDK is coming next.
-
-Use Generic HTTP today:
-
-${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
+    return [curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n");
   })();
 
   return (

@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { env } from "../../config/env";
 import { authService } from "../../modules/platform/services/auth.service";
 import { platformRepository } from "../../modules/platform/repositories/platform.repository";
 import { db } from "../../infrastructure/database/pool";
@@ -81,6 +82,12 @@ async function assertResourceScope(req: Request, organizationId: string) {
 }
 
 export const requireOrganizationContext = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  const isApiKeyValidation = req.method === "POST" && req.path === "/api/api-keys/validate";
+  if (isApiKeyValidation) {
+    next();
+    return;
+  }
+
   const authHeader = req.header("authorization");
 
   let user: any = undefined;
@@ -91,6 +98,8 @@ export const requireOrganizationContext = asyncHandler(async (req: Request, res:
     } catch (err) {
       throw new HttpError(401, "Invalid or expired token");
     }
+  } else if (env.REQUIRE_AUTH) {
+    throw new HttpError(401, "Authentication required");
   }
 
   let orgId = requestValue(req, "organizationId") ?? (await resourceOrganization(req));
@@ -114,7 +123,6 @@ export const requireOrganizationContext = asyncHandler(async (req: Request, res:
       }
     }
   } else {
-    // Local / demo mode fallback:
     if (!orgId) {
       const orgs = await platformRepository.listOrganizations();
       if (orgs.length > 0) {

@@ -99,7 +99,6 @@ function SidebarItem({
     >
       <Icon className={cn("h-4 w-4 shrink-0", active ? "text-mint" : "")} aria-hidden="true" />
       {!collapsed ? <span className="truncate">{item.label}</span> : null}
-      {!collapsed && item.planned ? <span className="ml-auto rounded-full border border-line px-1.5 py-0.5 text-[10px] text-slate-500">soon</span> : null}
     </button>
   );
 }

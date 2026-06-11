@@ -17,6 +17,7 @@ export function IconButton({ label, children, className, variant = "default", ..
 
   return (
     <button
+      type="button"
       aria-label={label}
       title={label}
       className={cn("grid h-9 w-9 place-items-center rounded-md border transition disabled:opacity-50", variantClass, className)}

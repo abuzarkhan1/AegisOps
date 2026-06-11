@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { RadioTower, ShieldCheck } from "lucide-react";
+import { AuthPage } from "./AuthPage";
+import { useAuth } from "./auth";
 import { coreApiUrl, gatewayUrl } from "./config";
 import { navByPath, navigationItems, navPath } from "./navigation";
 import { RouteView } from "./router";
+import { WorkspaceProvider } from "./workspace";
 import { AppShell } from "../shared/layout/AppShell";
 import { fetchHealthTarget } from "../shared/api/health";
 import type { HealthResult, HealthState } from "../shared/api/health";
@@ -15,6 +18,7 @@ const healthTargets = [
 const labelFromLocation = () => navByPath[window.location.pathname] ?? "Overview";
 
 function App() {
+  const auth = useAuth();
   const [activeNav, setActiveNav] = useState(labelFromLocation);
   const [health, setHealth] = useState<Record<string, HealthResult>>({});
 
@@ -57,10 +61,24 @@ function App() {
   );
   const shellStatus: HealthState = healthyCount === healthTargets.length ? "ok" : "degraded";
 
+  if (auth.status === "loading") {
+    return (
+      <div className="grid min-h-screen place-items-center bg-shell text-slate-100">
+        <div className="rounded-lg border border-line bg-panel p-5 text-sm text-slate-300 shadow-panel">Loading secure workspace</div>
+      </div>
+    );
+  }
+
+  if (auth.status === "anonymous") {
+    return <AuthPage />;
+  }
+
   return (
-    <AppShell activeNav={activeNav} onNavChange={handleNavChange} status={shellStatus}>
-      <RouteView activeNav={activeNav} health={health} onNavigate={handleNavChange} />
-    </AppShell>
+    <WorkspaceProvider>
+      <AppShell activeNav={activeNav} onNavChange={handleNavChange} status={shellStatus}>
+        <RouteView activeNav={activeNav} health={health} onNavigate={handleNavChange} />
+      </AppShell>
+    </WorkspaceProvider>
   );
 }
 

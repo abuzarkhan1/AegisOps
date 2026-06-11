@@ -18,7 +18,9 @@ export class RabbitMqTaskPublisher {
 
   async connect() {
     this.connection = await amqp.connect(env.RABBITMQ_URL);
+    this.bindConnectionHandlers(this.connection);
     this.channel = await this.connection.createChannel();
+    this.bindChannelHandlers(this.channel);
     await this.channel.assertExchange("aegisops.dlx", "direct", { durable: true });
     for (const queue of rabbitMqQueuesProduced) {
       const failedQueue = failedQueueFor(queue);
@@ -31,7 +33,8 @@ export class RabbitMqTaskPublisher {
 
   async publish(queue: string, task: WorkerTask) {
     if (!this.channel) {
-      throw new Error("RabbitMQ channel is not connected");
+      logger.warn({ queue, taskType: task.taskType }, "RabbitMQ channel is not connected; task was not published");
+      return;
     }
     const accepted = this.channel.sendToQueue(queue, Buffer.from(JSON.stringify(task)), {
       contentType: "application/json",
@@ -46,5 +49,32 @@ export class RabbitMqTaskPublisher {
   async close() {
     await this.channel?.close().catch(() => undefined);
     await this.connection?.close().catch(() => undefined);
+    this.channel = undefined;
+    this.connection = undefined;
+  }
+
+  private bindConnectionHandlers(connection: amqp.Connection) {
+    (connection as any).on("error", (error: Error) => {
+      logger.error({ error }, "RabbitMQ publisher connection error");
+    });
+    (connection as any).on("close", () => {
+      logger.warn("RabbitMQ publisher connection closed");
+      if (this.connection === connection) {
+        this.connection = undefined;
+        this.channel = undefined;
+      }
+    });
+  }
+
+  private bindChannelHandlers(channel: amqp.Channel) {
+    (channel as any).on("error", (error: Error) => {
+      logger.error({ error }, "RabbitMQ publisher channel error");
+    });
+    (channel as any).on("close", () => {
+      logger.warn("RabbitMQ publisher channel closed");
+      if (this.channel === channel) {
+        this.channel = undefined;
+      }
+    });
   }
 }

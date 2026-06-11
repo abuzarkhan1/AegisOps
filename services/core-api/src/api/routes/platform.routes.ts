@@ -17,6 +17,7 @@ import { requireOrganizationContext } from "../../shared/http/requireOrganizatio
 export const platformRouter = Router();
 
 platformRouter.use("/api/auth", authRouter);
+platformRouter.use("/api", systemRouter);
 
 // Enforce organization scoping and tenant isolation on all platform endpoints
 platformRouter.use(requireOrganizationContext);
@@ -33,6 +34,5 @@ platformRouter.use("/api/alert-rules", alertRuleRouter);
 platformRouter.use("/api/dashboard", dashboardRouter);
 platformRouter.use("/api", reportRouter);
 platformRouter.use("/api/audit-logs", auditLogRouter);
-platformRouter.use("/api", systemRouter);
 platformRouter.use("/api", logsRouter);
 platformRouter.use("/api", telemetryRouter);

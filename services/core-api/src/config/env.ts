@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+const booleanFromEnv = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+  const normalized = value.trim().toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "off"].includes(normalized)) return false;
+  return value;
+}, z.boolean());
+
 const envSchema = z.object({
   NODE_ENV: z.string().default("development"),
   SERVICE_NAME: z.string().default("core-api"),
@@ -10,7 +18,8 @@ const envSchema = z.object({
   RABBITMQ_URL: z.string().url().default("amqp://aegisops:aegisops@localhost:5672"),
   JWT_SECRET: z.string().min(16).default("local-development-jwt-secret-change-me"),
   JWT_EXPIRES_IN: z.string().default("1h"),
-  JWT_REFRESH_EXPIRES_IN_DAYS: z.coerce.number().int().positive().default(30)
+  JWT_REFRESH_EXPIRES_IN_DAYS: z.coerce.number().int().positive().default(30),
+  REQUIRE_AUTH: booleanFromEnv.default(true)
 });
 
 export const env = envSchema.parse(process.env);
