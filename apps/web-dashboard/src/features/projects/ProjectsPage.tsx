@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { FolderKanban, KeyRound, Plus, Server, Wand2 } from "lucide-react";
+import { FolderKanban, KeyRound, Plus, Server, Wand2, ExternalLink } from "lucide-react";
 import {
   createApiKey,
   createProject,
@@ -12,6 +12,8 @@ import {
   type ServiceRecord
 } from "../../shared/api/core";
 import { EmptyState } from "../../shared/ui/EmptyState";
+import { ProjectDetailPage } from "./ProjectDetailPage";
+import { ServiceDetailPage } from "../services/ServiceDetailPage";
 
 export function ProjectsPage() {
   const [organizations, setOrganizations] = useState<OrganizationRecord[]>([]);
@@ -20,6 +22,9 @@ export function ProjectsPage() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [status, setStatus] = useState<string>();
   const [generatedKey, setGeneratedKey] = useState<string>();
+
+  const [viewingProjectDetail, setViewingProjectDetail] = useState(false);
+  const [viewingServiceId, setViewingServiceId] = useState("");
 
   const selectedOrgId = organizations[0]?.id ?? "";
   const selectedProject = useMemo(() => projects.find((project) => project.id === selectedProjectId), [projects, selectedProjectId]);
@@ -91,6 +96,20 @@ export function ProjectsPage() {
     }
   }
 
+  if (viewingServiceId) {
+    return <ServiceDetailPage serviceId={viewingServiceId} onBack={() => setViewingServiceId("")} />;
+  }
+
+  if (viewingProjectDetail && selectedProject) {
+    return (
+      <ProjectDetailPage
+        project={selectedProject}
+        onBack={() => setViewingProjectDetail(false)}
+        onSelectService={(sId) => setViewingServiceId(sId)}
+      />
+    );
+  }
+
   return (
     <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
       <div className="space-y-4">
@@ -125,16 +144,28 @@ export function ProjectsPage() {
               const serviceCount = services.filter((service) => service.projectId === project.id).length;
               const mode = serviceCount <= 1 ? "monolith" : "microservices";
               return (
-                <button
+                <div
                   key={project.id}
                   onClick={() => setSelectedProjectId(project.id)}
-                  className={`w-full rounded-md border p-3 text-left text-sm ${
-                    selectedProjectId === project.id ? "border-mint/50 bg-mint/10" : "border-line bg-[#0d1419]"
+                  className={`w-full rounded-md border p-3 text-left text-sm cursor-pointer transition-all ${
+                    selectedProjectId === project.id ? "border-mint/50 bg-mint/10" : "border-line bg-[#0d1419] hover:border-slate-700"
                   }`}
                 >
                   <span className="block truncate font-medium text-white">{project.name}</span>
-                  <span className="text-xs text-slate-400">{project.projectKey ?? project.environment} · {mode}</span>
-                </button>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-slate-400">{project.projectKey ?? project.environment} · {mode}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProjectId(project.id);
+                        setViewingProjectDetail(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-xs text-mint hover:underline"
+                    >
+                      Open Dashboard <ExternalLink className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
               );
             })}
             {projects.length === 0 ? <EmptyState title="No projects yet" /> : null}
@@ -161,6 +192,7 @@ export function ProjectsPage() {
               <option value="db">db</option>
               <option value="queue">queue</option>
               <option value="cache">cache</option>
+              <option value="message-broker">message-broker</option>
               <option value="external">external</option>
             </select>
             <select name="language" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm">
@@ -187,14 +219,29 @@ export function ProjectsPage() {
               <div key={service.id} className="rounded-lg border border-line bg-[#0d1419] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-white">{service.name}</p>
+                    <button
+                      onClick={() => setViewingServiceId(service.id)}
+                      className="truncate text-sm font-semibold text-white hover:text-mint hover:underline text-left block"
+                    >
+                      {service.name}
+                    </button>
                     <p className="mt-1 text-xs text-slate-400">{service.serviceType ?? "api"} · {service.language ?? "runtime"}</p>
                   </div>
-                  <button title="Generate API key" onClick={() => generateKey(service)} className="grid h-9 w-9 place-items-center rounded-md border border-line bg-slate-900 text-slate-300 hover:text-white">
-                    <KeyRound className="h-4 w-4" />
+                  <div className="flex gap-2">
+                    <button title="Generate API key" onClick={() => generateKey(service)} className="grid h-9 w-9 place-items-center rounded-md border border-line bg-slate-900 text-slate-300 hover:text-white">
+                      <KeyRound className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                  <span className="truncate max-w-[180px]">{service.repositoryUrl ?? service.id}</span>
+                  <button
+                    onClick={() => setViewingServiceId(service.id)}
+                    className="inline-flex items-center gap-1 text-mint hover:underline"
+                  >
+                    View Details <ExternalLink className="h-3 w-3" />
                   </button>
                 </div>
-                <p className="mt-3 truncate text-xs text-slate-500">{service.repositoryUrl ?? service.id}</p>
               </div>
             ))}
             {projectServices.length === 0 ? <EmptyState title="No services in this project" /> : null}

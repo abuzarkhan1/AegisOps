@@ -33,6 +33,9 @@ export async function runRollups() {
     }
   ];
 
+  const results: Array<{ window: string; rowCount: number }> = [];
+  const failures: Array<{ window: string; error: unknown }> = [];
+
   for (const r of rollups) {
     try {
       const sql = `
@@ -119,11 +122,20 @@ export async function runRollups() {
       `;
 
       const res = await db.query(sql, [r.window]);
-      logger.info(`[rollup] computed ${r.window} aggregates for ${res.rowCount || 0} service metrics`);
+      const rowCount = res.rowCount || 0;
+      results.push({ window: r.window, rowCount });
+      logger.info(`[rollup] computed ${r.window} aggregates for ${rowCount} service metrics`);
     } catch (error) {
+      failures.push({ window: r.window, error });
       logger.error({ error, window: r.window }, `[rollup] Failed to compute ${r.window} aggregates`);
     }
   }
+
+  if (failures.length > 0) {
+    throw new Error(`Metric rollups failed for windows: ${failures.map((failure) => failure.window).join(", ")}`);
+  }
+
+  return results;
 }
 
 export async function runRetention() {
@@ -162,18 +174,19 @@ export async function runRetention() {
       [env.INCIDENT_EVENT_RETENTION_DAYS]
     );
 
-    logger.info(
-      {
-        durationMs: Date.now() - start,
-        deletedLogs: logRes.rowCount || 0,
-        deletedMetrics: metricRes.rowCount || 0,
-        deletedAggregates: aggRes.rowCount || 0,
-        deletedAuditLogs: auditRes.rowCount || 0,
-        deletedIncidentEvents: incidentRes.rowCount || 0
-      },
-      "[retention] Data retention cleanup completed"
-    );
+    const result = {
+      durationMs: Date.now() - start,
+      deletedLogs: logRes.rowCount || 0,
+      deletedMetrics: metricRes.rowCount || 0,
+      deletedAggregates: aggRes.rowCount || 0,
+      deletedAuditLogs: auditRes.rowCount || 0,
+      deletedIncidentEvents: incidentRes.rowCount || 0
+    };
+
+    logger.info(result, "[retention] Data retention cleanup completed");
+    return result;
   } catch (error) {
     logger.error({ error }, "[retention] Data retention cleanup failed");
+    throw error;
   }
 }

@@ -1,17 +1,23 @@
-import { Server } from "lucide-react";
+import { Server, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fetchServices } from "../../shared/api/core";
 import type { ServiceRecord } from "../../shared/api/core";
 import { EmptyState } from "../../shared/ui/EmptyState";
 import { StatusPill } from "../../shared/ui/StatusPill";
+import { ServiceDetailPage } from "./ServiceDetailPage";
 
 export function ServicesPage() {
   const [services, setServices] = useState<ServiceRecord[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState("");
   const [error, setError] = useState<string>();
 
   useEffect(() => {
     fetchServices().then(setServices).catch((err) => setError(err instanceof Error ? err.message : "Failed to load services"));
   }, []);
+
+  if (selectedServiceId) {
+    return <ServiceDetailPage serviceId={selectedServiceId} onBack={() => setSelectedServiceId("")} />;
+  }
 
   return (
     <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
@@ -26,16 +32,26 @@ export function ServicesPage() {
       {!error && services.length === 0 ? <EmptyState title="No services found" /> : null}
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {services.map((service) => (
-          <div key={service.id} className="rounded-lg border border-line bg-[#0d1419] p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="truncate text-sm font-medium text-white">{service.name}</p>
-              <StatusPill status={service.healthStatus === "healthy" ? "ok" : "degraded"} />
+          <div
+            key={service.id}
+            onClick={() => setSelectedServiceId(service.id)}
+            className="rounded-lg border border-line bg-[#0d1419] p-4 cursor-pointer hover:border-slate-700 transition-all flex flex-col justify-between"
+          >
+            <div>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="truncate text-sm font-medium text-white">{service.name}</p>
+                <StatusPill status={service.healthStatus === "healthy" ? "ok" : "degraded"} />
+              </div>
+              <p className="truncate text-xs text-slate-400">{service.repositoryUrl ?? service.language ?? service.id}</p>
             </div>
-            <p className="truncate text-xs text-slate-400">{service.repositoryUrl ?? service.language ?? service.id}</p>
+            <div className="mt-4 flex justify-end">
+              <span className="inline-flex items-center gap-1 text-xs text-mint hover:underline font-semibold">
+                Open Telemetry Dashboard <ExternalLink className="h-3 w-3" />
+              </span>
+            </div>
           </div>
         ))}
       </div>
     </div>
   );
 }
-

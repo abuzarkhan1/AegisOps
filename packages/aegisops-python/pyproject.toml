@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aegisops"
+version = "0.1.0"
+description = "AegisOps Python SDK for FastAPI and generic HTTP telemetry"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "UNLICENSED" }
+authors = [{ name = "AegisOps" }]
+dependencies = []
+
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.110"]
+test = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["aegisops*"]

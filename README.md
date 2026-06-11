@@ -106,6 +106,19 @@ curl http://localhost:9090/-/healthy
 | `/notify/email`, `/notify/slack`, `/notify/discord`, `/notify/settings/:orgId`, `/notify/history` | Notification Service |
 | `/deployments/*` | Deployment Tracker |
 
+## Project Instrumentation SDKs
+
+The Connect Project flow supports service-scoped ingestion through local SDK packages:
+
+| Framework | Package | Guide |
+| --- | --- | --- |
+| Node.js Express | `packages/aegisops-node` | `docs/node-express-integration.md` |
+| Python FastAPI | `packages/aegisops-python` | `docs/python-fastapi-integration.md` |
+| Java Spring Boot / Servlet | `packages/aegisops-java` | `docs/java-spring-boot-integration.md` |
+| Go `net/http` | `packages/aegisops-go` | `docs/go-http-integration.md` |
+
+All SDKs are fail-safe by default: telemetry failures are retried and dropped without crashing the monitored app.
+
 ## Validation
 
 ```bash
@@ -123,9 +136,13 @@ Seed demo projects and telemetry:
 
 ## Troubleshooting
 
-- If host service ports (4000, 4010, 4020, 5001, 5002, 8000, 8085) are already in use, you can stop all existing instances of these services by running:
+- If host service ports (4000, 4010, 4020, 5001, 5002, 5173, 8000, 8085) are already in use, you can stop all existing instances of these services by running:
   ```bash
   ./stop_services.sh
+  ```
+- To also stop shared Docker infrastructure, run:
+  ```bash
+  ./stop_services.sh --with-infra
   ```
 - If port `3000`, `5432`, `6379`, or another required port is already in use, stop the conflicting local service or adjust the compose port mapping.
 - If Docker image pulls hang on macOS credential lookup, run `docker logout` or fix Docker Desktop keychain access before pulling public infrastructure images.

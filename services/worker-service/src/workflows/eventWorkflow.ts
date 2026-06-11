@@ -4,6 +4,7 @@ import type { AegisOpsEvent, WorkerTask } from "../events/event.types";
 import { db } from "../infrastructure/database/pool";
 import { logger } from "../infrastructure/logging/logger";
 import type { RabbitMqTaskPublisher } from "../infrastructure/rabbitmq/publisher";
+import { clearTelemetryCaches } from "../infrastructure/redis/cacheInvalidation";
 
 const now = () => new Date().toISOString();
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -293,7 +294,17 @@ async function updateServiceHealth(payload: AegisOpsEvent) {
     return;
   }
   if (serviceName) {
-    await db.query("UPDATE services SET health_status = $2, updated_at = now() WHERE name = $1", [serviceName, normalized]);
+    await db.query(
+      `
+      UPDATE services
+      SET health_status = $2,
+          updated_at = now()
+      WHERE name = $1
+        AND ($3::uuid IS NULL OR organization_id = $3)
+        AND ($4::uuid IS NULL OR project_id = $4)
+      `,
+      [serviceName, normalized, uuidOrNull(payload.organizationId), uuidOrNull(payload.projectId)]
+    );
   }
 }
 
@@ -373,6 +384,11 @@ export async function processEvent(sourceTopic: string, payload: AegisOpsEvent, 
 
     case "deployments.created":
     case "deployments.completed":
+      await clearTelemetryCaches({
+        organizationId: stringOrNull(payload.organizationId),
+        projectId: uuidOrNull(payload.projectId),
+        serviceId: uuidOrNull(payload.serviceId)
+      });
       await publisher.publish("deployment.impact.analyze", task(sourceTopic, "deployment.impact.analyze", payload));
       return;
 

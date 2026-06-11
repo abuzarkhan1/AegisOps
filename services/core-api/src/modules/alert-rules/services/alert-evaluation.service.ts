@@ -1,4 +1,5 @@
 import { publishDomainEvent } from "../../../infrastructure/kafka/producer";
+import { clearDashboardCache, clearProjectCache, clearServiceCache } from "../../../utils/cacheInvalidation";
 import { platformRepository } from "../../platform/repositories/platform.repository";
 import type { AlertRule } from "../../platform/types/platform.types";
 
@@ -196,6 +197,9 @@ export async function evaluateAlertRules(input: AlertEvaluationInput) {
           incident.id
         );
       }
+      await clearDashboardCache(input.organizationId);
+      await clearProjectCache(input.projectId, input.organizationId);
+      await clearServiceCache(input.serviceId, input.organizationId);
     }
 
     results.push(result);
@@ -323,6 +327,9 @@ export async function evaluateLogAlertRules(input: LogAlertEvaluationInput) {
           incident.id
         );
       }
+      await clearDashboardCache(input.organizationId);
+      await clearProjectCache(input.projectId, input.organizationId);
+      await clearServiceCache(input.serviceId, input.organizationId);
     }
 
     results.push(result);

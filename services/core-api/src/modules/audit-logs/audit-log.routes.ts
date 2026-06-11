@@ -6,7 +6,8 @@ export const auditLogRouter = Router();
 
 auditLogRouter.get(
   "/",
-  asyncHandler(async (_req, res) => {
-    res.json({ auditLogs: await platformRepository.listAuditLogs() });
+  asyncHandler(async (req, res) => {
+    const organizationId = typeof req.query.organizationId === "string" ? req.query.organizationId : undefined;
+    res.json({ auditLogs: await platformRepository.listAuditLogs(organizationId) });
   })
 );

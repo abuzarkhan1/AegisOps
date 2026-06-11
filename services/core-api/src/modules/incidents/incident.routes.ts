@@ -9,7 +9,9 @@ import { publishDomainEvent } from "../../infrastructure/kafka/producer";
 
 export const incidentRouter = Router();
 
-async function invalidateIncidentCaches(orgId?: string, incidentId?: string) {
+import { clearDashboardCache, clearProjectCache, clearServiceCache } from "../../utils/cacheInvalidation";
+
+async function invalidateIncidentCaches(orgId?: string, incidentId?: string, projectId?: string, serviceId?: string) {
   try {
     await cache.delete(redisKeyPatterns.orgRecentIncidents("default"));
     await cache.delete(redisKeyPatterns.orgDashboardSummary("default"));
@@ -17,6 +19,9 @@ async function invalidateIncidentCaches(orgId?: string, incidentId?: string) {
     if (orgId) {
       await cache.delete(redisKeyPatterns.orgRecentIncidents(orgId));
       await cache.delete(redisKeyPatterns.orgDashboardSummary(orgId));
+      await clearDashboardCache(orgId);
+      await clearProjectCache(projectId, orgId);
+      await clearServiceCache(serviceId, orgId);
     }
     if (incidentId) {
       await cache.delete(redisKeyPatterns.incidentSummary(incidentId));
@@ -60,7 +65,7 @@ incidentRouter.post(
       metadata: { severity: incident.severity, serviceId: incident.serviceId }
     });
 
-    await invalidateIncidentCaches(orgId);
+    await invalidateIncidentCaches(orgId, incident.id, incident.projectId, incident.serviceId);
     await publishDomainEvent(
       "incidents.created",
       {
@@ -116,7 +121,7 @@ incidentRouter.patch(
       metadata: { status: incident.status, severity: incident.severity }
     });
 
-    await invalidateIncidentCaches(incident.organizationId, incidentId);
+    await invalidateIncidentCaches(incident.organizationId, incidentId, incident.projectId, incident.serviceId);
     await publishDomainEvent(
       incident.status === "resolved" ? "incidents.resolved" : "incidents.updated",
       {
@@ -155,7 +160,7 @@ incidentRouter.post(
       metadata: { assigneeId: incident.assigneeId }
     });
 
-    await invalidateIncidentCaches(incident.organizationId, incidentId);
+    await invalidateIncidentCaches(incident.organizationId, incidentId, incident.projectId, incident.serviceId);
     await publishDomainEvent(
       "incidents.updated",
       {
@@ -189,7 +194,7 @@ incidentRouter.post(
       resourceId: incident.id
     });
 
-    await invalidateIncidentCaches(incident.organizationId, incidentId);
+    await invalidateIncidentCaches(incident.organizationId, incidentId, incident.projectId, incident.serviceId);
     await publishDomainEvent(
       "incidents.resolved",
       {

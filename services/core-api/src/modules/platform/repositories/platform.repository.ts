@@ -46,6 +46,9 @@ const projectFields = `
   project_key AS "projectKey",
   name,
   environment,
+  project_type AS "projectType",
+  repository_url AS "repositoryUrl",
+  owner_team AS "ownerTeam",
   description,
   created_at AS "createdAt",
   updated_at AS "updatedAt"
@@ -137,6 +140,9 @@ const normalizeOrganization = (row: any): Organization => ({
 const normalizeProject = (row: any): Project => ({
   ...row,
   projectKey: row.projectKey ?? slugify(row.name ?? "project"),
+  projectType: row.projectType ?? "monolith",
+  repositoryUrl: row.repositoryUrl ?? undefined,
+  ownerTeam: row.ownerTeam ?? undefined,
   description: row.description ?? undefined,
   createdAt: toIso(row.createdAt) ?? new Date().toISOString(),
   updatedAt: toIso(row.updatedAt) ?? new Date().toISOString()
@@ -365,17 +371,28 @@ export class PlatformRepository {
     return Boolean(result.rowCount);
   }
 
+  async checkOrganizationMember(organizationId: string, userId: string): Promise<boolean> {
+    const result = await db.query(
+      "SELECT 1 FROM organization_members WHERE organization_id = $1 AND user_id = $2",
+      [organizationId, userId]
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
   async createProject(input: {
     organizationId: string;
     name: string;
     projectKey?: string;
     environment?: string;
+    projectType?: Project["projectType"];
+    repositoryUrl?: string;
+    ownerTeam?: string;
     description?: string;
   }) {
     const result = await db.query(
       `
-      INSERT INTO projects (id, organization_id, project_key, name, environment, description)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO projects (id, organization_id, project_key, name, environment, project_type, repository_url, owner_team, description)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING ${projectFields}
       `,
       [
@@ -384,6 +401,9 @@ export class PlatformRepository {
         slugify(input.projectKey ?? input.name),
         input.name,
         input.environment ?? "dev",
+        input.projectType ?? "monolith",
+        input.repositoryUrl ?? null,
+        input.ownerTeam ?? null,
         input.description ?? null
       ]
     );
@@ -409,7 +429,33 @@ export class PlatformRepository {
     return result.rows[0] ? normalizeProject(result.rows[0]) : undefined;
   }
 
-  async updateProject(projectId: string, patch: { name?: string; projectKey?: string; environment?: string; description?: string }) {
+  async getProjectByKey(projectKey: string, organizationId?: string) {
+    const result = await db.query(
+      `
+      SELECT ${projectFields}
+      FROM projects
+      WHERE project_key = $1
+        AND ($2::uuid IS NULL OR organization_id = $2)
+      ORDER BY created_at DESC
+      LIMIT 1
+      `,
+      [projectKey, organizationId ?? null]
+    );
+    return result.rows[0] ? normalizeProject(result.rows[0]) : undefined;
+  }
+
+  async updateProject(
+    projectId: string,
+    patch: {
+      name?: string;
+      projectKey?: string;
+      environment?: string;
+      projectType?: Project["projectType"];
+      repositoryUrl?: string;
+      ownerTeam?: string;
+      description?: string;
+    }
+  ) {
     const existing = await this.getProject(projectId);
     if (!existing) return undefined;
     const result = await db.query(
@@ -418,7 +464,10 @@ export class PlatformRepository {
       SET project_key = $2,
           name = $3,
           environment = $4,
-          description = $5,
+          project_type = $5,
+          repository_url = $6,
+          owner_team = $7,
+          description = $8,
           updated_at = now()
       WHERE id = $1
       RETURNING ${projectFields}
@@ -428,6 +477,9 @@ export class PlatformRepository {
         patch.projectKey ? slugify(patch.projectKey) : existing.projectKey,
         patch.name ?? existing.name,
         patch.environment ?? existing.environment,
+        patch.projectType ?? existing.projectType,
+        patch.repositoryUrl ?? existing.repositoryUrl ?? null,
+        patch.ownerTeam ?? existing.ownerTeam ?? null,
         patch.description ?? existing.description ?? null
       ]
     );
@@ -469,21 +521,30 @@ export class PlatformRepository {
     return normalizeService(result.rows[0]);
   }
 
-  async listServices(projectId?: string) {
+  async listServices(projectId?: string, organizationId?: string) {
     const result = await db.query(
       `
       SELECT ${serviceFields}
       FROM services
       WHERE ($1::uuid IS NULL OR project_id = $1)
+        AND ($2::uuid IS NULL OR organization_id = $2)
       ORDER BY created_at DESC
       `,
-      [projectId ?? null]
+      [projectId ?? null, organizationId ?? null]
     );
     return result.rows.map(normalizeService);
   }
 
   async getService(serviceId: string) {
     const result = await db.query(`SELECT ${serviceFields} FROM services WHERE id = $1`, [serviceId]);
+    return result.rows[0] ? normalizeService(result.rows[0]) : undefined;
+  }
+
+  async getServiceByName(projectId: string, name: string) {
+    const result = await db.query(
+      `SELECT ${serviceFields} FROM services WHERE project_id = $1 AND name = $2`,
+      [projectId, name]
+    );
     return result.rows[0] ? normalizeService(result.rows[0]) : undefined;
   }
 
@@ -526,6 +587,252 @@ export class PlatformRepository {
     return Boolean(result.rowCount);
   }
 
+  async getServiceConnectionStatus(serviceId: string, organizationId?: string) {
+    const result = await db.query(
+      `
+      WITH recent AS (
+        SELECT now() - interval '15 minutes' AS cutoff
+      ),
+      log_stats AS (
+        SELECT
+          max(timestamp) AS "lastLogAt",
+          max(timestamp) FILTER (WHERE COALESCE(metadata->>'eventType', '') <> 'test-event') AS "lastRealLogAt",
+          count(*) FILTER (WHERE COALESCE(metadata->>'eventType', '') = 'test-event')::int AS "testLogs",
+          count(*) FILTER (
+            WHERE timestamp >= (SELECT cutoff FROM recent)
+              AND COALESCE(metadata->>'eventType', '') <> 'test-event'
+          )::int AS "logsLast15m",
+          count(*) FILTER (
+            WHERE timestamp >= (SELECT cutoff FROM recent)
+              AND COALESCE(metadata->>'eventType', '') <> 'test-event'
+              AND COALESCE(status_code, 0) >= 400
+          )::int AS "errorLogsLast15m",
+          count(*) FILTER (
+            WHERE timestamp >= (SELECT cutoff FROM recent)
+              AND COALESCE(metadata->>'eventType', '') <> 'test-event'
+              AND status_code IS NOT NULL
+          )::int AS "requestLogsLast15m",
+          count(*) FILTER (WHERE COALESCE(metadata->>'eventType', '') <> 'test-event')::int AS "realLogs"
+        FROM logs
+        WHERE service_id = $1
+          AND ($2::uuid IS NULL OR organization_id = $2)
+      ),
+      metric_stats AS (
+        SELECT
+          max(timestamp) AS "lastMetricAt",
+          max(timestamp) FILTER (WHERE COALESCE(labels->>'source', '') <> 'connect-project') AS "lastRealMetricAt",
+          count(*) FILTER (WHERE COALESCE(labels->>'source', '') = 'connect-project')::int AS "testMetrics",
+          count(*) FILTER (
+            WHERE timestamp >= (SELECT cutoff FROM recent)
+              AND COALESCE(labels->>'source', '') <> 'connect-project'
+          )::int AS "metricsLast15m",
+          count(*) FILTER (WHERE COALESCE(labels->>'source', '') <> 'connect-project')::int AS "realMetrics",
+          COALESCE(sum(value) FILTER (
+            WHERE timestamp >= (SELECT cutoff FROM recent)
+              AND metric_name = 'http_requests_total'
+              AND COALESCE(labels->>'source', '') <> 'connect-project'
+          ), 0)::float AS "requestMetricSum",
+          COALESCE(sum(value) FILTER (
+            WHERE timestamp >= (SELECT cutoff FROM recent)
+              AND metric_name = 'http_errors_total'
+              AND COALESCE(labels->>'source', '') <> 'connect-project'
+          ), 0)::float AS "errorMetricSum",
+          COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY value) FILTER (
+            WHERE timestamp >= (SELECT cutoff FROM recent)
+              AND metric_name = 'http_request_duration_ms'
+              AND COALESCE(labels->>'source', '') <> 'connect-project'
+          ), 0)::float AS "p95LatencyLast15m"
+        FROM metrics
+        WHERE service_id = $1
+          AND ($2::uuid IS NULL OR organization_id = $2)
+      ),
+      alert_stats AS (
+        SELECT count(*) FILTER (WHERE enabled)::int AS "activeAlerts"
+        FROM alert_rules
+        WHERE service_id = $1
+          AND ($2::uuid IS NULL OR organization_id = $2)
+      )
+      SELECT *
+      FROM log_stats, metric_stats, alert_stats
+      `,
+      [serviceId, organizationId ?? null]
+    );
+    const row = result.rows[0] ?? {};
+    const lastLogAt = toIso(row.lastLogAt);
+    const lastMetricAt = toIso(row.lastMetricAt);
+    const lastRealLogAt = toIso(row.lastRealLogAt);
+    const lastRealMetricAt = toIso(row.lastRealMetricAt);
+    const lastHeartbeatAt = [lastLogAt, lastMetricAt].filter(Boolean).sort().at(-1);
+    const lastRealHeartbeatAt = [lastRealLogAt, lastRealMetricAt].filter(Boolean).sort().at(-1);
+    const logsLast15m = Number(row.logsLast15m ?? 0);
+    const metricsLast15m = Number(row.metricsLast15m ?? 0);
+    const realTelemetryEver = Number(row.realLogs ?? 0) + Number(row.realMetrics ?? 0) > 0;
+    const testTelemetryEver = Number(row.testLogs ?? 0) + Number(row.testMetrics ?? 0) > 0;
+    const requestMetricSum = Number(row.requestMetricSum ?? 0);
+    const errorMetricSum = Number(row.errorMetricSum ?? 0);
+    const requestLogsLast15m = Number(row.requestLogsLast15m ?? 0);
+    const errorLogsLast15m = Number(row.errorLogsLast15m ?? 0);
+    const requestsForErrorRate = requestMetricSum > 0 ? requestMetricSum : requestLogsLast15m;
+    const errorsForErrorRate = requestMetricSum > 0 ? errorMetricSum : errorLogsLast15m;
+    const errorRateLast15m = requestsForErrorRate > 0 ? Number(((errorsForErrorRate / requestsForErrorRate) * 100).toFixed(2)) : 0;
+    const p95LatencyLast15m = row.p95LatencyLast15m === null || row.p95LatencyLast15m === undefined ? 0 : Number(row.p95LatencyLast15m);
+    const hasRecentTelemetry = logsLast15m + metricsLast15m > 0;
+    const isStale = realTelemetryEver && (!lastRealHeartbeatAt || new Date(lastRealHeartbeatAt).getTime() < Date.now() - 15 * 60 * 1000);
+    const highErrorRate = requestsForErrorRate >= 20 && errorRateLast15m >= 5;
+    const status = !realTelemetryEver
+      ? testTelemetryEver
+        ? "waiting_for_telemetry"
+        : "not_connected"
+      : highErrorRate
+        ? "erroring"
+        : isStale || !hasRecentTelemetry
+          ? "stale"
+          : "connected";
+    const connected = status === "connected" || status === "erroring";
+
+    return {
+      serviceId,
+      connected,
+      status,
+      lastLogAt,
+      lastMetricAt,
+      lastHeartbeatAt,
+      logsLast15m,
+      metricsLast15m,
+      errorRateLast15m,
+      p95LatencyLast15m,
+      telemetryHealth: {
+        logs: logsLast15m > 0 ? "receiving" : realTelemetryEver ? "stale" : "waiting",
+        metrics: metricsLast15m > 0 ? "receiving" : realTelemetryEver ? "stale" : "waiting",
+        alerts: Number(row.activeAlerts ?? 0) > 0 ? "active" : "inactive"
+      }
+    };
+  }
+
+  async createServiceTestTelemetry(input: { project: Project; service: ServiceRecord }) {
+    const timestamp = new Date();
+    const requestId = `test-${newId()}`;
+    const route = "/aegisops/test-connection";
+    const method = "POST";
+    const statusCode = 200;
+    const durationMs = 18.4;
+    const environment = input.service.environment ?? input.project.environment ?? "dev";
+    const metadata = {
+      source: "connect-project",
+      eventType: "test-event",
+      serviceType: input.service.serviceType,
+      language: input.service.language
+    };
+    const labels = {
+      source: "connect-project",
+      route,
+      method,
+      statusCode: String(statusCode),
+      serviceType: input.service.serviceType
+    };
+    const logId = newId();
+    const requestMetricId = newId();
+    const durationMetricId = newId();
+
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `
+        INSERT INTO logs (
+          id,
+          organization_id,
+          project_id,
+          service_id,
+          project_key,
+          service_name,
+          level,
+          message,
+          trace_id,
+          request_id,
+          route,
+          method,
+          status_code,
+          duration_ms,
+          environment,
+          metadata,
+          timestamp
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, 'info', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        `,
+        [
+          logId,
+          input.project.organizationId,
+          input.project.id,
+          input.service.id,
+          input.project.projectKey,
+          input.service.name,
+          `AegisOps test event received for ${input.service.name}`,
+          requestId,
+          requestId,
+          route,
+          method,
+          statusCode,
+          durationMs,
+          environment,
+          JSON.stringify(metadata),
+          timestamp
+        ]
+      );
+
+      await client.query(
+        `
+        INSERT INTO metrics (
+          id,
+          organization_id,
+          project_id,
+          service_id,
+          project_key,
+          service_name,
+          environment,
+          metric_name,
+          value,
+          labels,
+          timestamp
+        )
+        VALUES
+          ($1, $2, $3, $4, $5, $6, $7, 'http_requests_total', 1, $8, $9),
+          ($10, $2, $3, $4, $5, $6, $7, 'http_request_duration_ms', $11, $8, $9)
+        `,
+        [
+          requestMetricId,
+          input.project.organizationId,
+          input.project.id,
+          input.service.id,
+          input.project.projectKey,
+          input.service.name,
+          environment,
+          JSON.stringify(labels),
+          timestamp,
+          durationMetricId,
+          durationMs
+        ]
+      );
+
+      await client.query(
+        "UPDATE services SET health_status = 'healthy', updated_at = now() WHERE id = $1",
+        [input.service.id]
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    return {
+      logId,
+      metricIds: [requestMetricId, durationMetricId],
+      timestamp: timestamp.toISOString()
+    };
+  }
+
   async createApiKey(input: { organizationId: string; serviceId?: string; name: string; prefix: string; keyHash: string }) {
     const result = await db.query(
       `
@@ -538,15 +845,16 @@ export class PlatformRepository {
     return normalizeApiKey(result.rows[0]);
   }
 
-  async listApiKeys(serviceId?: string) {
+  async listApiKeys(serviceId?: string, organizationId?: string) {
     const result = await db.query(
       `
       SELECT ${apiKeyFields}
       FROM api_keys
       WHERE ($1::uuid IS NULL OR service_id = $1)
+        AND ($2::uuid IS NULL OR organization_id = $2)
       ORDER BY created_at DESC
       `,
-      [serviceId ?? null]
+      [serviceId ?? null, organizationId ?? null]
     );
     return result.rows.map(normalizeApiKey).map(({ keyHash: _keyHash, ...apiKey }) => apiKey);
   }
@@ -898,8 +1206,17 @@ export class PlatformRepository {
     return Boolean(result.rowCount);
   }
 
-  async listAuditLogs() {
-    const result = await db.query(`SELECT ${auditFields} FROM audit_logs ORDER BY created_at DESC LIMIT 200`);
+  async listAuditLogs(organizationId?: string) {
+    const result = await db.query(
+      `
+      SELECT ${auditFields}
+      FROM audit_logs
+      WHERE ($1::uuid IS NULL OR organization_id = $1)
+      ORDER BY created_at DESC
+      LIMIT 200
+      `,
+      [organizationId ?? null]
+    );
     return result.rows.map(normalizeAuditLog);
   }
 
@@ -1014,6 +1331,256 @@ export class PlatformRepository {
       high: Number(row.high),
       open: Number(row.open)
     }));
+  }
+
+  async projectDetailSummary(filters: {
+    organizationId: string;
+    projectId: string;
+    environment?: string;
+    from?: string;
+    to?: string;
+  }) {
+    const result = await db.query(
+      `
+      WITH bounds AS (
+        SELECT
+          COALESCE($4::timestamptz, now() - interval '24 hours') AS from_ts,
+          COALESCE($5::timestamptz, now()) AS to_ts
+      ),
+      service_scope AS (
+        SELECT *
+        FROM services
+        WHERE organization_id = $1
+          AND project_id = $2
+          AND ($3::text IS NULL OR environment = $3)
+      ),
+      metric_scope AS (
+        SELECT m.*
+        FROM metrics m, bounds b
+        WHERE m.organization_id = $1
+          AND m.project_id = $2
+          AND ($3::text IS NULL OR m.environment = $3)
+          AND m.timestamp >= b.from_ts
+          AND m.timestamp <= b.to_ts
+      ),
+      aggregate_scope AS (
+        SELECT a.*
+        FROM metric_aggregates a, bounds b
+        WHERE a.organization_id = $1
+          AND a.project_id = $2
+          AND ($3::text IS NULL OR a.environment = $3)
+          AND a."window" = '1m'
+          AND a.timestamp_bucket >= b.from_ts
+          AND a.timestamp_bucket <= b.to_ts
+      )
+      SELECT
+        (SELECT GREATEST(EXTRACT(EPOCH FROM (to_ts - from_ts)), 1)::float FROM bounds) AS "windowSeconds",
+        (SELECT COUNT(*)::int FROM service_scope) AS "servicesCount",
+        (SELECT COUNT(*)::int FROM service_scope WHERE health_status = 'healthy') AS "healthyServices",
+        (SELECT COUNT(*)::int FROM service_scope WHERE health_status = 'degraded') AS "degradedServices",
+        (SELECT COUNT(*)::int FROM service_scope WHERE health_status = 'down') AS "downServices",
+        (
+          SELECT COUNT(*)::int
+          FROM incidents
+          WHERE organization_id = $1
+            AND project_id = $2
+            AND status <> 'resolved'
+        ) AS "activeIncidents",
+        (SELECT COUNT(*)::int FROM logs l, bounds b WHERE l.organization_id = $1 AND l.project_id = $2 AND ($3::text IS NULL OR l.environment = $3) AND l.timestamp >= b.from_ts AND l.timestamp <= b.to_ts) AS "logsIngested",
+        (SELECT COUNT(*)::int FROM metric_scope) AS "metricsIngested",
+        (
+          SELECT COALESCE(SUM(value), 0)::float
+          FROM metric_scope
+          WHERE metric_name IN ('http_requests_total', 'request_count', 'requestCount', 'worker_jobs_processed_total', 'service_events_total')
+        ) AS "totalThroughput",
+        (
+          SELECT COALESCE(COUNT(*), 0)::float
+          FROM metric_scope
+          WHERE metric_name = 'http_request_duration_ms'
+        ) AS "latencySamples",
+        (
+          SELECT COALESCE(
+            (COUNT(*) FILTER (WHERE COALESCE(NULLIF(regexp_replace(COALESCE(labels->>'statusCode', labels->>'status_code', labels->>'status', '200'), '[^0-9]', '', 'g'), ''), '200')::int >= 400) * 100.0)
+              / NULLIF(COUNT(*), 0),
+            0
+          )::float
+          FROM metric_scope
+          WHERE metric_name = 'http_request_duration_ms'
+        ) AS "errorRate",
+        (
+          SELECT COALESCE(MAX(p50), 0)::float
+          FROM aggregate_scope
+          WHERE metric_name IN ('http_request_duration_ms', 'db_query_duration_ms', 'external_api_duration_ms', 'queue_job_duration_ms')
+        ) AS "p50LatencyMs",
+        (
+          SELECT COALESCE(MAX(p95), 0)::float
+          FROM aggregate_scope
+          WHERE metric_name IN ('http_request_duration_ms', 'db_query_duration_ms', 'external_api_duration_ms', 'queue_job_duration_ms')
+        ) AS "p95LatencyMs",
+        (
+          SELECT COALESCE(MAX(p99), 0)::float
+          FROM aggregate_scope
+          WHERE metric_name IN ('http_request_duration_ms', 'db_query_duration_ms', 'external_api_duration_ms', 'queue_job_duration_ms')
+        ) AS "p99LatencyMs",
+        (
+          SELECT COALESCE((COUNT(*) FILTER (WHERE health_status = 'healthy') * 100.0) / NULLIF(COUNT(*), 0), 0)::float
+          FROM service_scope
+        ) AS "uptimePercent",
+        (
+          SELECT MAX(created_at)
+          FROM deployments
+          WHERE organization_id = $1
+            AND project_id = $2
+            AND ($3::text IS NULL OR environment = $3)
+        ) AS "lastDeploymentAt"
+      `,
+      [filters.organizationId, filters.projectId, filters.environment ?? null, filters.from ?? null, filters.to ?? null]
+    );
+    const row = result.rows[0] ?? {};
+    const windowSeconds = Math.max(Number(row.windowSeconds ?? 86_400), 1);
+    const { windowSeconds: _windowSeconds, ...summary } = row;
+    return {
+      ...summary,
+      requestsPerSecond:
+        Number(row.totalThroughput ?? 0) > 0
+          ? Number(row.totalThroughput) / windowSeconds
+          : Number(row.latencySamples ?? 0) / windowSeconds,
+      lastDeploymentAt: toIso(row.lastDeploymentAt)
+    };
+  }
+
+  async serviceDetailSummary(filters: {
+    organizationId: string;
+    serviceId: string;
+    environment?: string;
+    from?: string;
+    to?: string;
+  }) {
+    const result = await db.query(
+      `
+      WITH bounds AS (
+        SELECT
+          COALESCE($4::timestamptz, now() - interval '24 hours') AS from_ts,
+          COALESCE($5::timestamptz, now()) AS to_ts
+      ),
+      metric_scope AS (
+        SELECT m.*
+        FROM metrics m, bounds b
+        WHERE m.organization_id = $1
+          AND m.service_id = $2
+          AND ($3::text IS NULL OR m.environment = $3)
+          AND m.timestamp >= b.from_ts
+          AND m.timestamp <= b.to_ts
+      ),
+      aggregate_scope AS (
+        SELECT a.*
+        FROM metric_aggregates a, bounds b
+        WHERE a.organization_id = $1
+          AND a.service_id = $2
+          AND ($3::text IS NULL OR a.environment = $3)
+          AND a."window" = '1m'
+          AND a.timestamp_bucket >= b.from_ts
+          AND a.timestamp_bucket <= b.to_ts
+      )
+      SELECT
+        (SELECT GREATEST(EXTRACT(EPOCH FROM (to_ts - from_ts)), 1)::float FROM bounds) AS "windowSeconds",
+        (
+          SELECT COALESCE(SUM(value), 0)::float
+          FROM metric_scope
+          WHERE metric_name IN ('http_requests_total', 'request_count', 'requestCount', 'worker_jobs_processed_total', 'service_events_total')
+        ) AS "totalThroughput",
+        (
+          SELECT COALESCE(COUNT(*), 0)::float
+          FROM metric_scope
+          WHERE metric_name = 'http_request_duration_ms'
+        ) AS "latencySamples",
+        (
+          SELECT COALESCE(
+            (COUNT(*) FILTER (WHERE COALESCE(NULLIF(regexp_replace(COALESCE(labels->>'statusCode', labels->>'status_code', labels->>'status', '200'), '[^0-9]', '', 'g'), ''), '200')::int >= 400) * 100.0)
+              / NULLIF(COUNT(*), 0),
+            0
+          )::float
+          FROM metric_scope
+          WHERE metric_name = 'http_request_duration_ms'
+        ) AS "errorRate",
+        (
+          SELECT COALESCE(MAX(p50), 0)::float
+          FROM aggregate_scope
+          WHERE metric_name IN ('http_request_duration_ms', 'db_query_duration_ms', 'external_api_duration_ms', 'queue_job_duration_ms')
+        ) AS "p50LatencyMs",
+        (
+          SELECT COALESCE(MAX(p95), 0)::float
+          FROM aggregate_scope
+          WHERE metric_name IN ('http_request_duration_ms', 'db_query_duration_ms', 'external_api_duration_ms', 'queue_job_duration_ms')
+        ) AS "p95LatencyMs",
+        (
+          SELECT COALESCE(MAX(p99), 0)::float
+          FROM aggregate_scope
+          WHERE metric_name IN ('http_request_duration_ms', 'db_query_duration_ms', 'external_api_duration_ms', 'queue_job_duration_ms')
+        ) AS "p99LatencyMs",
+        (
+          SELECT COUNT(*)::int
+          FROM incidents
+          WHERE organization_id = $1
+            AND service_id = $2
+            AND status <> 'resolved'
+        ) AS "activeIncidents",
+        (
+          SELECT COUNT(*)::int
+          FROM logs l, bounds b
+          WHERE l.organization_id = $1
+            AND l.service_id = $2
+            AND ($3::text IS NULL OR l.environment = $3)
+            AND l.timestamp >= b.from_ts
+            AND l.timestamp <= b.to_ts
+        ) AS "logVolume",
+        (
+          SELECT MAX(created_at)
+          FROM deployments
+          WHERE organization_id = $1
+            AND service_id = $2
+            AND ($3::text IS NULL OR environment = $3)
+        ) AS "lastDeploymentAt",
+        (
+          SELECT MAX(timestamp)
+          FROM logs l, bounds b
+          WHERE l.organization_id = $1
+            AND l.service_id = $2
+            AND ($3::text IS NULL OR l.environment = $3)
+            AND l.timestamp >= b.from_ts
+            AND l.timestamp <= b.to_ts
+        ) AS "lastLogAt",
+        (
+          SELECT MAX(timestamp)
+          FROM metric_scope
+        ) AS "lastMetricAt",
+        (
+          SELECT CASE
+            WHEN health_status = 'healthy' THEN 100.0
+            WHEN health_status = 'degraded' THEN 50.0
+            WHEN health_status = 'down' THEN 0.0
+            ELSE 0.0
+          END::float
+          FROM services
+          WHERE organization_id = $1
+            AND id = $2
+        ) AS "uptimePercent"
+      `,
+      [filters.organizationId, filters.serviceId, filters.environment ?? null, filters.from ?? null, filters.to ?? null]
+    );
+    const row = result.rows[0] ?? {};
+    const windowSeconds = Math.max(Number(row.windowSeconds ?? 86_400), 1);
+    const { windowSeconds: _windowSeconds, ...summary } = row;
+    return {
+      ...summary,
+      requestsPerSecond:
+        Number(row.totalThroughput ?? 0) > 0
+          ? Number(row.totalThroughput) / windowSeconds
+          : Number(row.latencySamples ?? 0) / windowSeconds,
+      lastDeploymentAt: toIso(row.lastDeploymentAt),
+      lastLogAt: toIso(row.lastLogAt),
+      lastMetricAt: toIso(row.lastMetricAt)
+    };
   }
 
   toPublicUser(user: AuthUser) {
@@ -1363,7 +1930,7 @@ export class PlatformRepository {
     const sortBy = filters.sortBy || "requestCount";
     const result = await db.query(
       `
-      WITH combined AS (
+      WITH metric_rows AS (
         SELECT
           labels->>'route' AS route,
           COALESCE(labels->>'method', 'GET') AS method,
@@ -1379,9 +1946,8 @@ export class PlatformRepository {
           AND ($5::timestamptz IS NULL OR timestamp >= $5)
           AND ($6::timestamptz IS NULL OR timestamp <= $6)
           AND labels->>'route' IS NOT NULL
-        
-        UNION ALL
-        
+      ),
+      log_rows AS (
         SELECT
           route,
           COALESCE(method, 'GET') AS method,
@@ -1396,14 +1962,27 @@ export class PlatformRepository {
           AND ($4::text IS NULL OR environment = $4)
           AND ($5::timestamptz IS NULL OR timestamp >= $5)
           AND ($6::timestamptz IS NULL OR timestamp <= $6)
+      ),
+      combined AS (
+        SELECT * FROM metric_rows
+        UNION ALL
+        SELECT *
+        FROM log_rows lr
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM metric_rows mr
+          WHERE mr.route = lr.route
+            AND mr.method = lr.method
+        )
       )
       SELECT
         route,
         method,
         COUNT(*)::int AS "requestCount",
-        AVG(duration_ms)::double precision AS "avgLatency",
-        percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms)::double precision AS "p95Latency",
-        AVG(CASE WHEN COALESCE(status_code, 200) >= 500 THEN 100.0 ELSE 0.0 END)::double precision AS "errorRate",
+        COALESCE(AVG(duration_ms) FILTER (WHERE duration_ms IS NOT NULL), 0)::double precision AS "avgLatency",
+        COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) FILTER (WHERE duration_ms IS NOT NULL), 0)::double precision AS "p95Latency",
+        SUM(CASE WHEN COALESCE(status_code, 200) >= 400 THEN 1 ELSE 0 END)::int AS "errorCount",
+        AVG(CASE WHEN COALESCE(status_code, 200) >= 400 THEN 100.0 ELSE 0.0 END)::double precision AS "errorRate",
         SUM(CASE WHEN COALESCE(status_code, 200) >= 200 AND COALESCE(status_code, 200) < 300 THEN 1 ELSE 0 END)::int AS "status2xx",
         SUM(CASE WHEN COALESCE(status_code, 200) >= 400 AND COALESCE(status_code, 200) < 500 THEN 1 ELSE 0 END)::int AS "status4xx",
         SUM(CASE WHEN COALESCE(status_code, 200) >= 500 AND COALESCE(status_code, 200) < 600 THEN 1 ELSE 0 END)::int AS "status5xx",
@@ -1414,7 +1993,8 @@ export class PlatformRepository {
         CASE WHEN $7 = 'requestCount' THEN COUNT(*) END DESC,
         CASE WHEN $7 = 'avgLatency' THEN AVG(duration_ms) END DESC,
         CASE WHEN $7 = 'p95Latency' THEN percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) END DESC,
-        CASE WHEN $7 = 'errorRate' THEN AVG(CASE WHEN COALESCE(status_code, 200) >= 500 THEN 100.0 ELSE 0.0 END) END DESC,
+        CASE WHEN $7 = 'errorRate' THEN AVG(CASE WHEN COALESCE(status_code, 200) >= 400 THEN 100.0 ELSE 0.0 END) END DESC,
+        CASE WHEN $7 = 'errorCount' THEN SUM(CASE WHEN COALESCE(status_code, 200) >= 400 THEN 1 ELSE 0 END) END DESC,
         route ASC
       LIMIT $8
       `,
@@ -1432,9 +2012,14 @@ export class PlatformRepository {
 
     return result.rows.map((row) => ({
       ...row,
+      requestCount: Number(row.requestCount),
       avgLatency: row.avgLatency ? Number(row.avgLatency.toFixed(2)) : 0,
       p95Latency: row.p95Latency ? Number(row.p95Latency.toFixed(2)) : 0,
+      errorCount: Number(row.errorCount ?? 0),
       errorRate: row.errorRate ? Number(row.errorRate.toFixed(2)) : 0,
+      status2xx: Number(row.status2xx ?? 0),
+      status4xx: Number(row.status4xx ?? 0),
+      status5xx: Number(row.status5xx ?? 0),
       lastSeen: toIso(row.lastSeen)
     }));
   }

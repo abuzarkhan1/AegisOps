@@ -1,4 +1,4 @@
-import { RadioTower, ShieldCheck, Siren, Activity, GitBranch, BarChart3 } from "lucide-react";
+import { RadioTower, ShieldCheck, Siren, Activity, GitBranch, BarChart3, Cable, ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { HealthResult } from "../../shared/api/health";
 import {
@@ -19,7 +19,13 @@ const serviceTargets = [
   { name: "Core API", icon: RadioTower }
 ];
 
-export function OverviewPage({ health }: { health: Record<string, HealthResult> }) {
+export function OverviewPage({
+  health,
+  onNavigate
+}: {
+  health: Record<string, HealthResult>;
+  onNavigate?: (label: string) => void;
+}) {
   const [summary, setSummary] = useState<Record<string, number>>({});
   const [trends, setTrends] = useState<Array<Record<string, number | string>>>([]);
   const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
@@ -37,9 +43,36 @@ export function OverviewPage({ health }: { health: Record<string, HealthResult> 
   }, []);
 
   const maxTrend = Math.max(...trends.map((item) => Number(item.incidents ?? 0)), 1);
+  const noTelemetry =
+    Number(summary.projectsMonitored ?? 0) === 0 ||
+    Number(summary.servicesMonitored ?? 0) === 0 ||
+    (Number(summary.logsIngested ?? 0) === 0 && Number(summary.metricsIngested ?? 0) === 0);
 
   return (
     <div className="space-y-4">
+      {noTelemetry ? (
+        <section className="rounded-lg border border-mint/30 bg-mint/10 p-4 shadow-panel">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3">
+              <Cable className="mt-1 h-5 w-5 shrink-0 text-mint" aria-hidden="true" />
+              <div>
+                <h2 className="text-base font-semibold text-white">No monitored telemetry yet</h2>
+                <p className="mt-1 text-sm text-slate-300">Connect a project, generate an API key, then send a test event to verify logs and metrics.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              title="Connect Project"
+              onClick={() => onNavigate?.("Connect Project")}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950"
+            >
+              Connect Project
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
           <MetricRow label="Projects" value={String(summary.projectsMonitored ?? 0)} />

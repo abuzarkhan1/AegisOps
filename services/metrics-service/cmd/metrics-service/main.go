@@ -107,11 +107,14 @@ type apiKeyValidator struct {
 }
 
 type apiKeyContext struct {
-	OrganizationID string
-	ProjectID      string
-	ProjectKey     string
-	ServiceID      string
-	ServiceName    string
+	Valid          bool   `json:"valid,omitempty"`
+	OrganizationID string `json:"organizationId,omitempty"`
+	ProjectID      string `json:"projectId,omitempty"`
+	ProjectKey     string `json:"projectKey,omitempty"`
+	ServiceID      string `json:"serviceId,omitempty"`
+	ServiceName    string `json:"serviceName,omitempty"`
+	Environment    string `json:"environment,omitempty"`
+	Status         string `json:"status,omitempty"`
 }
 
 var customMetricsReceived = prometheus.NewCounterVec(
@@ -191,27 +194,31 @@ func metricsHandler(logger *slog.Logger, writer *kafka.Writer, validator *apiKey
 		if !authorizeRequest(w, r, logger, validator) {
 			return
 		}
-		apiKey := r.Header.Get("X-API-Key")
+		apiKey := apiKeyFromRequest(r)
 
 		var payload metricPayload
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON payload"})
 			return
 		}
+		payload = withDefaultMetricTimestamp(payload)
 
 		if err := validateMetricPayload(payload); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
 
-		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey)
+		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey, payload.ProjectKey, payload.ServiceName)
 		if contextErr != nil {
 			logger.Error("API key context lookup failed", "error", contextErr)
+			writeJSON(w, http.StatusUnauthorized, authErrorResponse("Invalid or revoked API key"))
+			return
 		}
 		organizationID := firstNonEmpty(payload.OrganizationID, keyContext.OrganizationID)
 		projectID := firstNonEmpty(payload.ProjectID, keyContext.ProjectID)
 		projectKey := firstNonEmpty(payload.ProjectKey, keyContext.ProjectKey)
 		serviceID := firstNonEmpty(payload.ServiceID, keyContext.ServiceID)
+		payload.Environment = firstNonEmpty(payload.Environment, keyContext.Environment, "production")
 
 		body, err := json.Marshal(map[string]interface{}{
 			"eventType":      "metrics.received",
@@ -274,7 +281,7 @@ func batchMetricsHandler(logger *slog.Logger, writer *kafka.Writer, validator *a
 			return
 		}
 
-		apiKey := r.Header.Get("X-API-Key")
+		apiKey := apiKeyFromRequest(r)
 		limited, err := isRateLimited(r.Context(), validator.redisAddr, "metrics-batch", apiKey, 300)
 		if err != nil {
 			logger.Error("Rate limit check failed", "error", err)
@@ -288,19 +295,23 @@ func batchMetricsHandler(logger *slog.Logger, writer *kafka.Writer, validator *a
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON payload"})
 			return
 		}
+		payload = withDefaultMetricBatchTimestamps(payload)
 		if err := validateMetricBatch(payload); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
 
-		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey)
+		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey, payload.ProjectKey, payload.ServiceName)
 		if contextErr != nil {
 			logger.Error("API key context lookup failed", "error", contextErr)
+			writeJSON(w, http.StatusUnauthorized, authErrorResponse("Invalid or revoked API key"))
+			return
 		}
 		payload.OrganizationID = firstNonEmpty(payload.OrganizationID, keyContext.OrganizationID)
 		payload.ProjectID = firstNonEmpty(payload.ProjectID, keyContext.ProjectID)
 		payload.ProjectKey = firstNonEmpty(payload.ProjectKey, keyContext.ProjectKey)
 		payload.ServiceID = firstNonEmpty(payload.ServiceID, keyContext.ServiceID)
+		payload.Environment = firstNonEmpty(payload.Environment, keyContext.Environment, "production")
 
 		messages := make([]kafka.Message, 0, len(payload.Metrics))
 		metricsForAlert := make(map[string]float64, len(payload.Metrics))
@@ -370,7 +381,7 @@ func metricsIngestHandler(logger *slog.Logger, writer *kafka.Writer, validator *
 			return
 		}
 
-		apiKey := r.Header.Get("X-API-Key")
+		apiKey := apiKeyFromRequest(r)
 		limited, err := isRateLimited(r.Context(), validator.redisAddr, "metrics-ingest", apiKey, 500)
 		if err != nil {
 			logger.Error("Rate limit check failed", "error", err)
@@ -384,15 +395,19 @@ func metricsIngestHandler(logger *slog.Logger, writer *kafka.Writer, validator *
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON payload"})
 			return
 		}
+		payload = withDefaultMetricSnapshotTimestamp(payload)
 		if err := validateMetricSnapshot(payload); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
 
-		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey)
+		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey, payload.ProjectKey, payload.ServiceName)
 		if contextErr != nil {
 			logger.Error("API key context lookup failed", "error", contextErr)
+			writeJSON(w, http.StatusUnauthorized, authErrorResponse("Invalid or revoked API key"))
+			return
 		}
+		payload.Environment = firstNonEmpty(payload.Environment, keyContext.Environment, "production")
 		payload.OrganizationID = firstNonEmpty(payload.OrganizationID, keyContext.OrganizationID)
 		payload.ProjectID = firstNonEmpty(payload.ProjectID, keyContext.ProjectID)
 		payload.ProjectKey = firstNonEmpty(payload.ProjectKey, keyContext.ProjectKey)
@@ -455,15 +470,19 @@ func healthSnapshotHandler(logger *slog.Logger, writer *kafka.Writer, validator 
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON payload"})
 			return
 		}
+		payload = withDefaultHealthTimestamp(payload)
 		if err := validateHealthSnapshot(payload); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
-		apiKey := r.Header.Get("X-API-Key")
-		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey)
+		apiKey := apiKeyFromRequest(r)
+		keyContext, contextErr := validator.resolveContext(r.Context(), apiKey, payload.ProjectID, payload.ServiceName)
 		if contextErr != nil {
 			logger.Error("API key context lookup failed", "error", contextErr)
+			writeJSON(w, http.StatusUnauthorized, authErrorResponse("Invalid or revoked API key"))
+			return
 		}
+		payload.Environment = firstNonEmpty(payload.Environment, keyContext.Environment, "production")
 		payload.OrganizationID = firstNonEmpty(payload.OrganizationID, keyContext.OrganizationID)
 		payload.ProjectID = firstNonEmpty(payload.ProjectID, keyContext.ProjectID)
 		payload.ServiceID = firstNonEmpty(payload.ServiceID, keyContext.ServiceID)
@@ -527,17 +546,32 @@ func serviceSummaryHandler(store *summaryStore) http.HandlerFunc {
 }
 
 func authorizeRequest(w http.ResponseWriter, r *http.Request, logger *slog.Logger, validator *apiKeyValidator) bool {
-	valid, detail, err := validator.validate(r.Context(), r.Header.Get("X-API-Key"))
+	valid, detail, err := validator.validate(r.Context(), apiKeyFromRequest(r))
 	if err != nil {
 		logger.Error("API key validation failed", "error", err)
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "api key validation unavailable"})
 		return false
 	}
 	if !valid {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": detail})
+		message := "Invalid or revoked API key"
+		if strings.Contains(strings.ToLower(detail), "required") {
+			message = "API key required"
+		}
+		writeJSON(w, http.StatusUnauthorized, authErrorResponse(message))
 		return false
 	}
 	return true
+}
+
+func apiKeyFromRequest(r *http.Request) string {
+	if apiKey := strings.TrimSpace(r.Header.Get("X-API-Key")); apiKey != "" {
+		return apiKey
+	}
+	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
+	if len(authHeader) >= 7 && strings.EqualFold(authHeader[:7], "Bearer ") {
+		return strings.TrimSpace(authHeader[7:])
+	}
+	return ""
 }
 
 func healthHandler(serviceName string, brokers []string, redisAddr string, coreAPIURL string) http.HandlerFunc {
@@ -577,15 +611,65 @@ func newAPIKeyValidator(redisAddr string, coreAPIURL string) *apiKeyValidator {
 	}
 }
 
+func apiKeyContextCacheKey(keyHash string) string {
+	return "api-key:" + keyHash + ":context"
+}
+
+func orgApiKeyCacheKey(orgID string, keyHash string) string {
+	return "org:" + orgID + ":api-key:" + keyHash
+}
+
+func (validator *apiKeyValidator) cachedContext(ctx context.Context, keyHash string, projectRef string, serviceRef string) (apiKeyContext, bool) {
+	cached, err := redisGet(ctx, validator.redisAddr, apiKeyContextCacheKey(keyHash))
+	if err != nil || cached == "" {
+		return apiKeyContext{}, false
+	}
+	var keyContext apiKeyContext
+	if err := json.Unmarshal([]byte(cached), &keyContext); err != nil {
+		return apiKeyContext{}, false
+	}
+	if !keyContext.Valid || keyContext.Status == "revoked" {
+		return apiKeyContext{}, false
+	}
+	if !contextMatchesRequest(keyContext, projectRef, serviceRef) {
+		return apiKeyContext{}, false
+	}
+	return keyContext, true
+}
+
+func (validator *apiKeyValidator) cacheContext(ctx context.Context, keyHash string, keyContext apiKeyContext) {
+	if keyContext.OrganizationID == "" {
+		return
+	}
+	keyContext.Valid = true
+	body, err := json.Marshal(keyContext)
+	if err != nil {
+		return
+	}
+	_ = redisSetEX(ctx, validator.redisAddr, apiKeyContextCacheKey(keyHash), string(body), 5*time.Minute)
+	_ = redisSetEX(ctx, validator.redisAddr, orgApiKeyCacheKey(keyContext.OrganizationID, keyHash), string(body), 5*time.Minute)
+}
+
+func contextMatchesRequest(keyContext apiKeyContext, projectRef string, serviceRef string) bool {
+	projectRef = strings.TrimSpace(projectRef)
+	serviceRef = strings.TrimSpace(serviceRef)
+	if projectRef != "" && keyContext.ProjectKey != projectRef && keyContext.ProjectID != projectRef {
+		return false
+	}
+	if serviceRef != "" && keyContext.ServiceName != serviceRef && keyContext.ServiceID != serviceRef {
+		return false
+	}
+	return keyContext.OrganizationID != ""
+}
+
 func (validator *apiKeyValidator) validate(ctx context.Context, rawKey string) (bool, string, error) {
 	rawKey = strings.TrimSpace(rawKey)
 	if rawKey == "" {
-		return false, "X-API-Key header is required", nil
+		return false, "X-API-Key or Authorization Bearer token is required", nil
 	}
 
 	keyHash := hashAPIKey(rawKey)
-	cacheKey := "api-key-validation:" + keyHash
-	if cached, err := redisGet(ctx, validator.redisAddr, cacheKey); err == nil && cached == "valid" {
+	if _, ok := validator.cachedContext(ctx, keyHash, "", ""); ok {
 		return true, "valid", nil
 	}
 
@@ -608,25 +692,34 @@ func (validator *apiKeyValidator) validate(ctx context.Context, rawKey string) (
 	}
 
 	var validation struct {
-		Valid bool `json:"valid"`
+		Valid  bool          `json:"valid"`
+		APIKey apiKeyContext `json:"apiKey"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&validation); err != nil {
 		return false, "", err
 	}
 	if validation.Valid {
-		_ = redisSetEX(ctx, validator.redisAddr, cacheKey, "valid", 15*time.Minute)
+		validator.cacheContext(ctx, keyHash, validation.APIKey)
 		return true, "valid", nil
 	}
 	return false, "invalid API key", nil
 }
 
-func (validator *apiKeyValidator) resolveContext(ctx context.Context, rawKey string) (apiKeyContext, error) {
+func (validator *apiKeyValidator) resolveContext(ctx context.Context, rawKey string, projectKey string, serviceName string) (apiKeyContext, error) {
 	rawKey = strings.TrimSpace(rawKey)
 	if rawKey == "" {
-		return apiKeyContext{}, errors.New("X-API-Key header is required")
+		return apiKeyContext{}, errors.New("X-API-Key or Authorization Bearer token is required")
+	}
+	keyHash := hashAPIKey(rawKey)
+	if keyContext, ok := validator.cachedContext(ctx, keyHash, projectKey, serviceName); ok {
+		return keyContext, nil
 	}
 
-	body, err := json.Marshal(map[string]string{"apiKey": rawKey})
+	body, err := json.Marshal(map[string]string{
+		"apiKey":      rawKey,
+		"projectKey":  projectKey,
+		"serviceName": serviceName,
+	})
 	if err != nil {
 		return apiKeyContext{}, err
 	}
@@ -645,28 +738,38 @@ func (validator *apiKeyValidator) resolveContext(ctx context.Context, rawKey str
 	}
 
 	var validation struct {
-		Valid  bool `json:"valid"`
-		APIKey struct {
+		Valid   bool   `json:"valid"`
+		Message string `json:"message"`
+		APIKey  struct {
 			OrganizationID string `json:"organizationId"`
 			ProjectID      string `json:"projectId"`
 			ProjectKey     string `json:"projectKey"`
 			ServiceID      string `json:"serviceId"`
 			ServiceName    string `json:"serviceName"`
+			Environment    string `json:"environment"`
 		} `json:"apiKey"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&validation); err != nil {
 		return apiKeyContext{}, err
 	}
 	if !validation.Valid {
-		return apiKeyContext{}, errors.New("invalid API key")
+		msg := "invalid API key"
+		if validation.Message != "" {
+			msg = validation.Message
+		}
+		return apiKeyContext{}, errors.New(msg)
 	}
-	return apiKeyContext{
+	keyContext := apiKeyContext{
+		Valid:          true,
 		OrganizationID: validation.APIKey.OrganizationID,
 		ProjectID:      validation.APIKey.ProjectID,
 		ProjectKey:     validation.APIKey.ProjectKey,
 		ServiceID:      validation.APIKey.ServiceID,
 		ServiceName:    validation.APIKey.ServiceName,
-	}, nil
+		Environment:    validation.APIKey.Environment,
+	}
+	validator.cacheContext(ctx, keyHash, keyContext)
+	return keyContext, nil
 }
 
 func evaluateAlertRules(ctx context.Context, coreAPIURL string, payload metricSnapshotPayload, keyContext apiKeyContext) error {
@@ -830,16 +933,10 @@ func validateMetricPayload(payload metricPayload) error {
 	if strings.TrimSpace(payload.ServiceName) == "" {
 		return errors.New("serviceName is required")
 	}
-	if strings.TrimSpace(payload.Environment) == "" {
-		return errors.New("environment is required")
-	}
 	if strings.TrimSpace(payload.MetricName) == "" {
 		return errors.New("metricName is required")
 	}
-	if strings.TrimSpace(payload.Timestamp) == "" {
-		return errors.New("timestamp is required")
-	}
-	if _, err := time.Parse(time.RFC3339, payload.Timestamp); err != nil {
+	if _, err := time.Parse(time.RFC3339Nano, payload.Timestamp); err != nil {
 		return errors.New("timestamp must be RFC3339")
 	}
 	return nil
@@ -849,13 +946,7 @@ func validateMetricSnapshot(payload metricSnapshotPayload) error {
 	if strings.TrimSpace(payload.ServiceName) == "" {
 		return errors.New("serviceName is required")
 	}
-	if strings.TrimSpace(payload.Environment) == "" {
-		return errors.New("environment is required")
-	}
-	if strings.TrimSpace(payload.Timestamp) == "" {
-		return errors.New("timestamp is required")
-	}
-	if _, err := time.Parse(time.RFC3339, payload.Timestamp); err != nil {
+	if _, err := time.Parse(time.RFC3339Nano, payload.Timestamp); err != nil {
 		return errors.New("timestamp must be RFC3339")
 	}
 	if len(payload.Metrics) == 0 {
@@ -868,9 +959,6 @@ func validateMetricBatch(payload metricBatchPayload) error {
 	if strings.TrimSpace(payload.ServiceName) == "" {
 		return errors.New("serviceName is required")
 	}
-	if strings.TrimSpace(payload.Environment) == "" {
-		return errors.New("environment is required")
-	}
 	if len(payload.Metrics) == 0 {
 		return errors.New("metrics must contain at least one item")
 	}
@@ -881,10 +969,7 @@ func validateMetricBatch(payload metricBatchPayload) error {
 		if strings.TrimSpace(item.MetricName) == "" {
 			return fmt.Errorf("metrics[%d].metricName is required", index)
 		}
-		if strings.TrimSpace(item.Timestamp) == "" {
-			return fmt.Errorf("metrics[%d].timestamp is required", index)
-		}
-		if _, err := time.Parse(time.RFC3339, item.Timestamp); err != nil {
+		if _, err := time.Parse(time.RFC3339Nano, item.Timestamp); err != nil {
 			return fmt.Errorf("metrics[%d].timestamp must be RFC3339", index)
 		}
 	}
@@ -895,19 +980,47 @@ func validateHealthSnapshot(payload healthSnapshotPayload) error {
 	if strings.TrimSpace(payload.ServiceName) == "" {
 		return errors.New("serviceName is required")
 	}
-	if strings.TrimSpace(payload.Environment) == "" {
-		return errors.New("environment is required")
-	}
 	if strings.TrimSpace(payload.Status) == "" {
 		return errors.New("status is required")
 	}
-	if strings.TrimSpace(payload.Timestamp) == "" {
-		return errors.New("timestamp is required")
-	}
-	if _, err := time.Parse(time.RFC3339, payload.Timestamp); err != nil {
+	if _, err := time.Parse(time.RFC3339Nano, payload.Timestamp); err != nil {
 		return errors.New("timestamp must be RFC3339")
 	}
 	return nil
+}
+
+func defaultTimestamp() string {
+	return time.Now().UTC().Format(time.RFC3339Nano)
+}
+
+func withDefaultMetricTimestamp(payload metricPayload) metricPayload {
+	if strings.TrimSpace(payload.Timestamp) == "" {
+		payload.Timestamp = defaultTimestamp()
+	}
+	return payload
+}
+
+func withDefaultMetricSnapshotTimestamp(payload metricSnapshotPayload) metricSnapshotPayload {
+	if strings.TrimSpace(payload.Timestamp) == "" {
+		payload.Timestamp = defaultTimestamp()
+	}
+	return payload
+}
+
+func withDefaultMetricBatchTimestamps(payload metricBatchPayload) metricBatchPayload {
+	for index, item := range payload.Metrics {
+		if strings.TrimSpace(item.Timestamp) == "" {
+			payload.Metrics[index].Timestamp = defaultTimestamp()
+		}
+	}
+	return payload
+}
+
+func withDefaultHealthTimestamp(payload healthSnapshotPayload) healthSnapshotPayload {
+	if strings.TrimSpace(payload.Timestamp) == "" {
+		payload.Timestamp = defaultTimestamp()
+	}
+	return payload
 }
 
 func (store *summaryStore) recordMetrics(payload metricSnapshotPayload) {
@@ -1058,6 +1171,13 @@ func writeJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func authErrorResponse(message string) map[string]interface{} {
+	return map[string]interface{}{
+		"success": false,
+		"error":   message,
+	}
 }
 
 func getenv(key string, fallback string) string {

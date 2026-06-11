@@ -5,8 +5,12 @@ import { healthStatus, optionalString, requiredString, serviceType } from "../..
 import { platformRepository } from "../platform/repositories/platform.repository";
 import { cache } from "../../infrastructure/redis/cache";
 import { redisKeyPatterns } from "../../utils/cacheKeys";
+import { clearServiceCache, clearProjectCache } from "../../utils/cacheInvalidation";
 
 export const serviceRouter = Router();
+
+const queryString = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : undefined);
+
 serviceRouter.get(
   "/projects/:projectId/services",
   asyncHandler(async (req, res) => {
@@ -22,7 +26,7 @@ serviceRouter.get(
       return;
     }
 
-    const services = await platformRepository.listServices(projectId);
+    const services = await platformRepository.listServices(projectId, orgId);
     await cache.set(cacheKey, services, 300); // 5 mins TTL
     res.json({ services });
   })
@@ -53,6 +57,7 @@ serviceRouter.post(
     // Invalidate caches
     await cache.delete(redisKeyPatterns.orgServices(service.organizationId));
     await cache.delete(`${redisKeyPatterns.orgServices(service.organizationId)}:project:${project.id}`);
+    await clearProjectCache(project.id, service.organizationId);
 
     res.status(201).json({ service });
   })
@@ -72,6 +77,71 @@ serviceRouter.get(
     if (!service) throw notFound("Service");
     await cache.set(cacheKey, service, 300); // 5 mins TTL
     res.json({ service });
+  })
+);
+
+serviceRouter.get(
+  "/services/:serviceId/detail-summary",
+  asyncHandler(async (req, res) => {
+    const serviceId = req.params.serviceId;
+    const service = await platformRepository.getService(serviceId);
+    if (!service) throw notFound("Service");
+
+    const organizationId = queryString(req.query.organizationId) ?? service.organizationId;
+    const environment = queryString(req.query.environment);
+    const from = queryString(req.query.from);
+    const to = queryString(req.query.to);
+    const cacheKey = `service:${service.id}:detail-summary:${organizationId}:${environment ?? "all"}:${from ?? "default"}:${to ?? "now"}`;
+    const cached = await cache.get<any>(cacheKey);
+    if (cached) {
+      res.json({ summary: cached });
+      return;
+    }
+
+    const summary = await platformRepository.serviceDetailSummary({
+      organizationId,
+      serviceId: service.id,
+      environment,
+      from,
+      to
+    });
+    await cache.set(cacheKey, summary, 30);
+    res.json({ summary });
+  })
+);
+
+serviceRouter.get(
+  "/services/:serviceId/connection-status",
+  asyncHandler(async (req, res) => {
+    const service = await platformRepository.getService(req.params.serviceId);
+    if (!service) throw notFound("Service");
+
+    const status = await platformRepository.getServiceConnectionStatus(service.id, service.organizationId);
+    res.json(status);
+  })
+);
+
+serviceRouter.post(
+  "/services/:serviceId/test-event",
+  asyncHandler(async (req, res) => {
+    const service = await platformRepository.getService(req.params.serviceId);
+    if (!service) throw notFound("Service");
+    const project = await platformRepository.getProject(service.projectId);
+    if (!project) throw notFound("Project");
+
+    const event = await platformRepository.createServiceTestTelemetry({ project, service });
+    await platformRepository.audit({
+      organizationId: service.organizationId,
+      action: "service.test_event_created",
+      resourceType: "service",
+      resourceId: service.id,
+      metadata: { projectId: project.id, logId: event.logId, metricIds: event.metricIds }
+    });
+    await clearServiceCache(service.id, service.organizationId);
+    await clearProjectCache(project.id, service.organizationId);
+
+    const connectionStatus = await platformRepository.getServiceConnectionStatus(service.id, service.organizationId);
+    res.status(201).json({ event, connectionStatus });
   })
 );
 
@@ -102,6 +172,8 @@ serviceRouter.patch(
     await cache.delete(redisKeyPatterns.orgServices(service.organizationId));
     await cache.delete(`${redisKeyPatterns.orgServices(service.organizationId)}:project:${service.projectId}`);
     await cache.delete(redisKeyPatterns.serviceConfig(serviceId));
+    await clearServiceCache(serviceId, service.organizationId);
+    await clearProjectCache(service.projectId, service.organizationId);
 
     res.json({ service });
   })
@@ -124,6 +196,8 @@ serviceRouter.delete(
     await cache.delete(redisKeyPatterns.orgServices(service.organizationId));
     await cache.delete(`${redisKeyPatterns.orgServices(service.organizationId)}:project:${service.projectId}`);
     await cache.delete(redisKeyPatterns.serviceConfig(serviceId));
+    await clearServiceCache(serviceId, service.organizationId);
+    await clearProjectCache(service.projectId, service.organizationId);
 
     res.status(204).send();
   })

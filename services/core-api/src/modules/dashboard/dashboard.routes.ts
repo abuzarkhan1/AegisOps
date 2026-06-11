@@ -27,8 +27,9 @@ dashboardRouter.get(
 
 dashboardRouter.get(
   "/service-health",
-  asyncHandler(async (_req, res) => {
-    res.json({ services: await platformRepository.listServices() });
+  asyncHandler(async (req, res) => {
+    const orgId = typeof req.query.organizationId === "string" ? req.query.organizationId : undefined;
+    res.json({ services: await platformRepository.listServices(undefined, orgId) });
   })
 );
 
@@ -49,7 +50,7 @@ dashboardRouter.get(
         status
       })
     ).slice(0, 10);
-    await cache.set(cacheKey, incidents, 60); // 60 seconds TTL
+    await cache.set(cacheKey, incidents, 30); // 30 seconds TTL
     res.json({ incidents });
   })
 );

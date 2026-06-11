@@ -14,6 +14,11 @@ export const redisKeyPatterns = {
   metricsSummary: (orgId: string, projectId: string, serviceId: string, timeRange: string) =>
     `metrics:${orgId}:${projectId}:${serviceId}:summary:${timeRange}`,
   recentLogs: (orgId: string, projectId: string, serviceId: string) => `logs:${orgId}:${projectId}:${serviceId}:recent`,
+  projectDetailSummary: (projectId: string) => `project:${projectId}:detail-summary`,
+  serviceDetailSummary: (serviceId: string) => `service:${serviceId}:detail-summary`,
+  routePerformance: (projectId: string, serviceId = "all-services") => `route-performance:${projectId}:${serviceId}`,
+  recentLogsQuery: (orgId: string) => `recent-logs:${orgId}`,
+  metricChartData: (orgId: string) => `metric-chart-data:${orgId}`,
   rateLimit: (apiKey: string, minute: string) => `rate-limit:${apiKey}:${minute}`
 };
 
@@ -32,5 +37,10 @@ export const documentedRedisPatterns = [
   "incident:{incidentId}:summary",
   "metrics:{orgId}:{projectId}:{serviceId}:summary:{timeRange}",
   "logs:{orgId}:{projectId}:{serviceId}:recent",
+  "project:{projectId}:detail-summary:{orgId}:{env}:{from}:{to}",
+  "service:{serviceId}:detail-summary:{orgId}:{env}:{from}:{to}",
+  "route-performance:{projectId}:{serviceId}:{orgId}:{env}:{from}:{to}:{sortBy}:{limit}",
+  "recent-logs:{orgId}:{projectId}:{serviceId}:...",
+  "metric-chart-data:{orgId}:{projectId}:{serviceId}:...",
   "rate-limit:{apiKey}:{minute}"
 ];

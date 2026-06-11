@@ -11,17 +11,20 @@ import {
   TerminalSquare,
   BarChart3,
   ActivitySquare,
-  UsersRound
+  UsersRound,
+  Cable
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type NavigationItem = {
   label: string;
   icon: LucideIcon;
+  path?: string;
 };
 
 export const navigationItems: NavigationItem[] = [
   { label: "Overview", icon: LayoutDashboard },
+  { label: "Connect Project", icon: Cable, path: "/connect-project" },
   { label: "Projects", icon: FolderKanban },
   { label: "Services", icon: ListTree },
   { label: "Alert Rules", icon: ActivitySquare },

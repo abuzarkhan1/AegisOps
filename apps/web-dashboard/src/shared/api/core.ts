@@ -35,8 +35,29 @@ export type ProjectRecord = {
   projectKey?: string;
   name: string;
   environment: string;
+  projectType?: "monolith" | "microservices" | "worker-queue" | "frontend" | "hybrid";
+  repositoryUrl?: string;
+  ownerTeam?: string;
   description?: string;
   createdAt: string;
+};
+
+export type ServiceConnectionStatus = {
+  serviceId: string;
+  connected: boolean;
+  lastLogAt?: string;
+  lastMetricAt?: string;
+  lastHeartbeatAt?: string;
+  status: "not_connected" | "waiting_for_telemetry" | "connected" | "stale" | "erroring" | string;
+  logsLast15m?: number;
+  metricsLast15m?: number;
+  errorRateLast15m?: number;
+  p95LatencyLast15m?: number;
+  telemetryHealth?: {
+    logs?: string;
+    metrics?: string;
+    alerts?: string;
+  };
 };
 
 export type AlertRuleRecord = {
@@ -122,6 +143,55 @@ export type MetricAggregateRecord = {
   p99: number;
 };
 
+export type RoutePerformanceRecord = {
+  route: string;
+  method: string;
+  requestCount: number;
+  avgLatency: number;
+  p95Latency: number;
+  errorCount: number;
+  errorRate: number;
+  status2xx: number;
+  status4xx: number;
+  status5xx: number;
+  lastSeen?: string;
+};
+
+export type ProjectDetailSummary = {
+  servicesCount: number;
+  healthyServices: number;
+  degradedServices: number;
+  downServices: number;
+  activeIncidents: number;
+  logsIngested: number;
+  metricsIngested: number;
+  totalThroughput: number;
+  latencySamples: number;
+  requestsPerSecond: number;
+  errorRate: number;
+  p50LatencyMs: number;
+  p95LatencyMs: number;
+  p99LatencyMs: number;
+  uptimePercent: number;
+  lastDeploymentAt?: string;
+};
+
+export type ServiceDetailSummary = {
+  totalThroughput: number;
+  latencySamples: number;
+  requestsPerSecond: number;
+  errorRate: number;
+  p50LatencyMs: number;
+  p95LatencyMs: number;
+  p99LatencyMs: number;
+  activeIncidents: number;
+  logVolume: number;
+  uptimePercent: number;
+  lastDeploymentAt?: string;
+  lastLogAt?: string;
+  lastMetricAt?: string;
+};
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
@@ -158,25 +228,80 @@ export async function fetchProjects(params?: Record<string, string>) {
   return data.projects;
 }
 
+export async function fetchProject(projectId: string) {
+  const data = await request<{ project: ProjectRecord }>(`${coreApiUrl}/api/projects/${projectId}`);
+  return data.project;
+}
+
+export async function fetchProjectDetailSummary(projectId: string, params?: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams();
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
+    }
+  }
+  const data = await request<{ summary: ProjectDetailSummary }>(
+    `${coreApiUrl}/api/projects/${projectId}/detail-summary${query.toString() ? `?${query}` : ""}`
+  );
+  return data.summary;
+}
+
 export async function createProject(payload: Record<string, unknown>) {
-  return request<{ project: ProjectRecord }>(`${coreApiUrl}/api/projects`, {
+  return request<{ project: ProjectRecord }>(`${coreApiUrl}/api/v1/projects`, {
     method: "POST",
     body: JSON.stringify(payload)
   });
 }
 
 export async function createService(projectId: string, payload: Record<string, unknown>) {
-  return request<{ service: ServiceRecord }>(`${coreApiUrl}/api/projects/${projectId}/services`, {
+  return request<{ service: ServiceRecord }>(`${coreApiUrl}/api/v1/projects/${projectId}/services`, {
     method: "POST",
     body: JSON.stringify(payload)
   });
 }
 
+export async function fetchProjectServices(projectId: string) {
+  const data = await request<{ services: ServiceRecord[] }>(`${coreApiUrl}/api/v1/projects/${projectId}/services`);
+  return data.services;
+}
+
+export async function fetchService(serviceId: string) {
+  const data = await request<{ service: ServiceRecord }>(`${coreApiUrl}/api/services/${serviceId}`);
+  return data.service;
+}
+
+export async function fetchServiceDetailSummary(serviceId: string, params?: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams();
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
+    }
+  }
+  const data = await request<{ summary: ServiceDetailSummary }>(
+    `${coreApiUrl}/api/services/${serviceId}/detail-summary${query.toString() ? `?${query}` : ""}`
+  );
+  return data.summary;
+}
+
 export async function createApiKey(serviceId: string, name: string) {
-  return request<{ apiKey: { id: string; rawKey: string; prefix: string } }>(`${coreApiUrl}/api/services/${serviceId}/api-keys`, {
+  return request<{ apiKey: { id: string; rawKey: string; prefix: string } }>(`${coreApiUrl}/api/v1/services/${serviceId}/api-keys`, {
     method: "POST",
     body: JSON.stringify({ name })
   });
+}
+
+export async function fetchServiceConnectionStatus(serviceId: string) {
+  return request<ServiceConnectionStatus>(`${coreApiUrl}/api/v1/services/${serviceId}/connection-status`);
+}
+
+export async function sendServiceTestEvent(serviceId: string) {
+  return request<{ event: Record<string, unknown>; connectionStatus: ServiceConnectionStatus }>(
+    `${coreApiUrl}/api/v1/services/${serviceId}/test-event`,
+    {
+      method: "POST",
+      body: JSON.stringify({})
+    }
+  );
 }
 
 export async function fetchTeamMembers(orgId: string) {
@@ -224,7 +349,7 @@ export async function fetchErrorTrends(hours = 24) {
 export async function ingestLog(apiKey: string, payload: Record<string, unknown>) {
   return request<{ status: string; topic: string }>(`${gatewayUrl}/ingest/logs`, {
     method: "POST",
-    headers: { "X-API-Key": apiKey },
+    headers: { Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify(payload)
   });
 }
@@ -232,7 +357,7 @@ export async function ingestLog(apiKey: string, payload: Record<string, unknown>
 export async function ingestMetric(apiKey: string, payload: Record<string, unknown>) {
   return request<{ status: string; topic: string }>(`${gatewayUrl}/metrics-api/ingest`, {
     method: "POST",
-    headers: { "X-API-Key": apiKey },
+    headers: { Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify(payload)
   });
 }
@@ -240,7 +365,7 @@ export async function ingestMetric(apiKey: string, payload: Record<string, unkno
 export async function ingestCustomMetric(apiKey: string, payload: Record<string, unknown>) {
   return request<{ status: string; topic: string }>(`${gatewayUrl}/metrics-api/metrics/custom`, {
     method: "POST",
-    headers: { "X-API-Key": apiKey },
+    headers: { Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify(payload)
   });
 }
@@ -248,7 +373,7 @@ export async function ingestCustomMetric(apiKey: string, payload: Record<string,
 export async function ingestBatchMetrics(apiKey: string, payload: Record<string, unknown>) {
   return request<{ status: string; topic: string; count: number }>(`${gatewayUrl}/metrics-api/metrics/batch`, {
     method: "POST",
-    headers: { "X-API-Key": apiKey },
+    headers: { Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify(payload)
   });
 }
@@ -301,7 +426,7 @@ export async function sendNotification(provider: "email" | "slack" | "discord", 
   });
 }
 
-export async function fetchLogs(params?: Record<string, string | number>) {
+export async function fetchLogs(params?: Record<string, string | number | undefined>) {
   const query = new URLSearchParams();
   if (params) {
     for (const [key, value] of Object.entries(params)) {
@@ -316,7 +441,7 @@ export async function fetchLogs(params?: Record<string, string | number>) {
   return data.logs;
 }
 
-export async function fetchMetrics(params?: Record<string, string | number>) {
+export async function fetchMetrics(params?: Record<string, string | number | undefined>) {
   const query = new URLSearchParams();
   if (params) {
     for (const [key, value] of Object.entries(params)) {
@@ -329,7 +454,7 @@ export async function fetchMetrics(params?: Record<string, string | number>) {
   return data.metrics;
 }
 
-export async function fetchMetricAggregates(params?: Record<string, string | number>) {
+export async function fetchMetricAggregates(params?: Record<string, string | number | undefined>) {
   const query = new URLSearchParams();
   if (params) {
     for (const [key, value] of Object.entries(params)) {
@@ -363,4 +488,21 @@ export async function resolveIncident(incidentId: string) {
   return request<any>(`${coreApiUrl}/api/incidents/${incidentId}/resolve`, {
     method: "POST"
   });
+}
+
+export async function fetchRoutePerformance(projectId: string, serviceId?: string, params?: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams();
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") {
+        query.set(key, String(value));
+      }
+    }
+  }
+  const queryString = query.toString();
+  const url = serviceId
+    ? `${coreApiUrl}/api/v1/projects/${projectId}/services/${serviceId}/routes/performance${queryString ? `?${queryString}` : ""}`
+    : `${coreApiUrl}/api/v1/projects/${projectId}/routes/performance${queryString ? `?${queryString}` : ""}`;
+  const data = await request<{ performance: RoutePerformanceRecord[] }>(url);
+  return data.performance;
 }

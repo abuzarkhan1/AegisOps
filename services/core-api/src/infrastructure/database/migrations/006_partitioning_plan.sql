@@ -1,0 +1,95 @@
+-- AegisOps Phase 3: PostgreSQL Partitioning and Retention Migration Plan
+--
+-- This migration documents the range partitioning strategy for telemetry tables:
+--   - logs (partitioned by timestamp monthly)
+--   - metrics (partitioned by timestamp monthly)
+--
+-- NOTE: Table partitioning in PostgreSQL requires table recreation since primary keys
+-- must include the partition key. This script provides the exact transition DDL.
+
+-- PARTITIONING PLAN FOR 'logs' TABLE:
+-- ===================================
+--
+-- 1. Rename the existing logs table:
+--    ALTER TABLE logs RENAME TO logs_old;
+--
+-- 2. Create the partitioned logs table:
+--    CREATE TABLE logs (
+--      id UUID NOT NULL,
+--      organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+--      project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+--      service_id UUID REFERENCES services(id) ON DELETE SET NULL,
+--      project_key TEXT,
+--      service_name TEXT NOT NULL,
+--      level TEXT NOT NULL,
+--      message TEXT NOT NULL,
+--      trace_id TEXT,
+--      request_id TEXT,
+--      span_id TEXT,
+--      parent_span_id TEXT,
+--      route TEXT,
+--      method TEXT,
+--      status_code INTEGER,
+--      duration_ms DOUBLE PRECISION,
+--      environment TEXT NOT NULL,
+--      metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+--      timestamp TIMESTAMPTZ NOT NULL,
+--      created_at TIMESTAMPTZ DEFAULT now(),
+--      PRIMARY KEY (id, timestamp)
+--    ) PARTITION BY RANGE (timestamp);
+--
+-- 3. Create indices on the partitioned logs table:
+--    CREATE INDEX idx_logs_partition_org_project ON logs(organization_id, project_id, service_id, timestamp DESC);
+--    CREATE INDEX idx_logs_partition_trace ON logs(trace_id);
+--
+-- 4. Create active monthly partition tables:
+--    CREATE TABLE logs_y2026m06 PARTITION OF logs
+--      FOR VALUES FROM ('2026-06-01 00:00:00+00') TO ('2026-07-01 00:00:00+00');
+--    CREATE TABLE logs_y2026m07 PARTITION OF logs
+--      FOR VALUES FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00');
+--
+-- 5. Backfill records from logs_old:
+--    INSERT INTO logs SELECT * FROM logs_old ON CONFLICT DO NOTHING;
+--
+-- 6. Clean up:
+--    DROP TABLE logs_old;
+
+
+-- PARTITIONING PLAN FOR 'metrics' TABLE:
+-- ======================================
+--
+-- 1. Rename the existing metrics table:
+--    ALTER TABLE metrics RENAME TO metrics_old;
+--
+-- 2. Create the partitioned metrics table:
+--    CREATE TABLE metrics (
+--      id UUID NOT NULL,
+--      organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+--      project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+--      service_id UUID REFERENCES services(id) ON DELETE SET NULL,
+--      project_key TEXT,
+--      service_name TEXT NOT NULL,
+--      environment TEXT NOT NULL,
+--      metric_name TEXT NOT NULL,
+--      value DOUBLE PRECISION NOT NULL,
+--      labels JSONB NOT NULL DEFAULT '{}'::jsonb,
+--      timestamp TIMESTAMPTZ NOT NULL,
+--      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+--      PRIMARY KEY (id, timestamp)
+--    ) PARTITION BY RANGE (timestamp);
+--
+-- 3. Create indices on the partitioned metrics table:
+--    CREATE INDEX idx_metrics_partition_lookup ON metrics(organization_id, project_id, service_id, timestamp DESC);
+--    CREATE INDEX idx_metrics_partition_name ON metrics(metric_name, timestamp DESC);
+--
+-- 4. Create active monthly partition tables:
+--    CREATE TABLE metrics_y2026m06 PARTITION OF metrics
+--      FOR VALUES FROM ('2026-06-01 00:00:00+00') TO ('2026-07-01 00:00:00+00');
+--    CREATE TABLE metrics_y2026m07 PARTITION OF metrics
+--      FOR VALUES FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00');
+--
+-- 5. Backfill records from metrics_old:
+--    INSERT INTO metrics SELECT * FROM metrics_old ON CONFLICT DO NOTHING;
+--
+-- 6. Clean up:
+--    DROP TABLE metrics_old;

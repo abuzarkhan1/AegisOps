@@ -4,7 +4,17 @@ export type IncidentSeverity = "low" | "medium" | "high" | "critical";
 export type IncidentStatus = "open" | "investigating" | "identified" | "monitoring" | "resolved";
 export type AlertOperator = "gt" | "lt" | "gte" | "lte" | "eq";
 export type ApiKeyStatus = "active" | "revoked";
-export type ServiceType = "api" | "frontend" | "worker" | "database" | "db" | "queue" | "cache" | "external";
+export type ServiceType =
+  | "api"
+  | "frontend"
+  | "worker"
+  | "database"
+  | "db"
+  | "queue"
+  | "cache"
+  | "message-broker"
+  | "external"
+  | "external-api";
 
 export type User = {
   id: string;
@@ -36,6 +46,9 @@ export type Project = {
   projectKey: string;
   name: string;
   environment: string;
+  projectType: "monolith" | "microservices" | "worker-queue" | "frontend" | "hybrid";
+  repositoryUrl?: string;
+  ownerTeam?: string;
   description?: string;
   createdAt: string;
   updatedAt: string;

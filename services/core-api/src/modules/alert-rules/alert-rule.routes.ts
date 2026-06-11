@@ -13,6 +13,7 @@ import { platformRepository } from "../platform/repositories/platform.repository
 import { cache } from "../../infrastructure/redis/cache";
 import { redisKeyPatterns } from "../../utils/cacheKeys";
 import { evaluateAlertRules, evaluateLogAlertRules } from "./services/alert-evaluation.service";
+import { clearDashboardCache } from "../../utils/cacheInvalidation";
 
 export const alertRuleRouter = Router();
 
@@ -78,6 +79,7 @@ alertRuleRouter.post(
 
     // Invalidate cache
     await cache.delete(redisKeyPatterns.orgAlertRules(orgId));
+    await clearDashboardCache(orgId);
 
     res.status(201).json({ alertRule });
   })
@@ -147,6 +149,7 @@ alertRuleRouter.patch(
 
     // Invalidate cache
     await cache.delete(redisKeyPatterns.orgAlertRules(alertRule.organizationId));
+    await clearDashboardCache(alertRule.organizationId);
 
     res.json({ alertRule });
   })
@@ -167,6 +170,7 @@ alertRuleRouter.delete(
     // Invalidate cache
     if (existing?.organizationId) {
       await cache.delete(redisKeyPatterns.orgAlertRules(existing.organizationId));
+      await clearDashboardCache(existing.organizationId);
     }
 
     res.status(204).send();

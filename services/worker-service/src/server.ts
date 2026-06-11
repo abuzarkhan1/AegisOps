@@ -12,6 +12,40 @@ const app = createApp();
 const publisher = new RabbitMqTaskPublisher();
 let kafkaConsumer: KafkaEventConsumer | undefined;
 let rabbitConsumer: RabbitMqTaskConsumer | undefined;
+let rollupJobRunning = false;
+let retentionJobRunning = false;
+
+async function runRollupJob(source: string) {
+  if (rollupJobRunning) {
+    logger.warn({ source }, "Skipping rollup job because a previous run is still active");
+    return;
+  }
+
+  rollupJobRunning = true;
+  try {
+    await runRollups();
+  } catch (error) {
+    logger.error({ error, source }, "Error in rollup job");
+  } finally {
+    rollupJobRunning = false;
+  }
+}
+
+async function runRetentionJob(source: string) {
+  if (retentionJobRunning) {
+    logger.warn({ source }, "Skipping retention job because a previous run is still active");
+    return;
+  }
+
+  retentionJobRunning = true;
+  try {
+    await runRetention();
+  } catch (error) {
+    logger.error({ error, source }, "Error in retention job");
+  } finally {
+    retentionJobRunning = false;
+  }
+}
 
 async function start() {
   try {
@@ -35,17 +69,17 @@ async function start() {
 
   // Scheduled background jobs
   setInterval(() => {
-    runRollups().catch((err) => logger.error({ error: err }, "Error in rollup scheduler"));
+    void runRollupJob("scheduler");
   }, 60_000);
 
   setInterval(() => {
-    runRetention().catch((err) => logger.error({ error: err }, "Error in retention scheduler"));
+    void runRetentionJob("scheduler");
   }, 3_600_000);
 
   // Trigger once shortly after startup
   setTimeout(() => {
-    runRollups().catch((err) => logger.error({ error: err }, "Error in startup rollup"));
-    runRetention().catch((err) => logger.error({ error: err }, "Error in startup retention"));
+    void runRollupJob("startup");
+    void runRetentionJob("startup");
   }, 5_000);
 
   app.listen(env.PORT, "0.0.0.0", () => {

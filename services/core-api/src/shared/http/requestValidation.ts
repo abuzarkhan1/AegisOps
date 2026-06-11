@@ -4,6 +4,7 @@ import type {
   IncidentSeverity,
   IncidentStatus,
   Organization,
+  Project,
   ServiceRecord,
   ServiceType,
   UserRole
@@ -91,7 +92,22 @@ export const serviceType = (value: unknown): ServiceType | undefined => {
     value === "db" ||
     value === "queue" ||
     value === "cache" ||
+    value === "message-broker" ||
+    value === "external-api" ||
     value === "external"
+  ) {
+    return value;
+  }
+  return undefined;
+};
+
+export const projectType = (value: unknown): Project["projectType"] | undefined => {
+  if (
+    value === "monolith" ||
+    value === "microservices" ||
+    value === "worker-queue" ||
+    value === "frontend" ||
+    value === "hybrid"
   ) {
     return value;
   }

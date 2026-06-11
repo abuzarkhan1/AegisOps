@@ -1,8 +1,15 @@
 import { Router } from "express";
 import { asyncHandler } from "../../shared/http/asyncHandler";
 import { platformRepository } from "../platform/repositories/platform.repository";
+import { requireOrganizationContext } from "../../shared/http/requireOrganizationContext";
+import { cache } from "../../infrastructure/redis/cache";
 
 export const logsRouter = Router();
+
+logsRouter.use(requireOrganizationContext);
+
+const cacheParts = (...parts: Array<string | number | undefined>) =>
+  parts.map((part) => (part === undefined || part === "" ? "all" : String(part))).join(":");
 
 logsRouter.get(
   "/logs",
@@ -23,7 +30,7 @@ logsRouter.get(
     const search = typeof req.query.search === "string" ? req.query.search : undefined;
     const limit = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : undefined;
 
-    const logs = await platformRepository.listLogs({
+    const filters = {
       organizationId,
       projectId,
       serviceId,
@@ -39,7 +46,33 @@ logsRouter.get(
       to,
       search,
       limit: isNaN(limit as number) ? undefined : limit
-    });
+    };
+    const cacheKey = cacheParts(
+      "recent-logs",
+      organizationId,
+      projectId,
+      serviceId,
+      projectKey,
+      serviceName,
+      level,
+      environment,
+      traceId,
+      requestId,
+      route,
+      Number.isFinite(statusCode) ? statusCode : undefined,
+      from,
+      to,
+      search,
+      filters.limit
+    );
+    const cached = await cache.get<any[]>(cacheKey);
+    if (cached) {
+      res.json({ logs: cached });
+      return;
+    }
+
+    const logs = await platformRepository.listLogs(filters);
+    await cache.set(cacheKey, logs, 15);
 
     res.json({ logs });
   })

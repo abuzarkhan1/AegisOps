@@ -32,38 +32,40 @@ async function main() {
   });
   const organizationId = registration.organization.id;
 
-  const loanProject = (await request(`${core}/api/projects`, {
+  const loanProject = (await request(`${core}/api/v1/projects`, {
     method: "POST",
     body: JSON.stringify({
       organizationId,
       name: "Loan Tracker",
       projectKey: `loan-tracker-demo-${suffix}`,
       environment: "production",
+      projectType: "monolith",
       description: "Monolith backend demo"
     })
   })).project;
-  const loanService = (await request(`${core}/api/projects/${loanProject.id}/services`, {
+  const loanService = (await request(`${core}/api/v1/projects/${loanProject.id}/services`, {
     method: "POST",
     body: JSON.stringify({ name: "loan-tracker-api", environment: "production", serviceType: "api", language: "node" })
   })).service;
-  const loanKey = (await request(`${core}/api/services/${loanService.id}/api-keys`, {
+  const loanKey = (await request(`${core}/api/v1/services/${loanService.id}/api-keys`, {
     method: "POST",
     body: JSON.stringify({ name: "loan-tracker demo key" })
   })).apiKey.rawKey;
 
-  const commerceProject = (await request(`${core}/api/projects`, {
+  const commerceProject = (await request(`${core}/api/v1/projects`, {
     method: "POST",
     body: JSON.stringify({
       organizationId,
       name: "Aegis Commerce",
       projectKey: `aegis-commerce-demo-${suffix}`,
       environment: "production",
+      projectType: "microservices",
       description: "Microservices demo"
     })
   })).project;
   const commerceServices = [];
   for (const name of ["api-gateway", "auth-service", "payment-service", "order-service", "notification-worker", "redis-cache", "postgres-primary"]) {
-    const service = (await request(`${core}/api/projects/${commerceProject.id}/services`, {
+    const service = (await request(`${core}/api/v1/projects/${commerceProject.id}/services`, {
       method: "POST",
       body: JSON.stringify({
         name,
@@ -74,7 +76,7 @@ async function main() {
     })).service;
     commerceServices.push(service);
   }
-  const commerceKey = (await request(`${core}/api/services/${commerceServices[0].id}/api-keys`, {
+  const commerceKey = (await request(`${core}/api/v1/services/${commerceServices[0].id}/api-keys`, {
     method: "POST",
     body: JSON.stringify({ name: "aegis-commerce demo key" })
   })).apiKey.rawKey;
@@ -84,7 +86,7 @@ async function main() {
     const timestamp = new Date(now.getTime() - i * 60_000).toISOString();
     await request(`${gateway}/ingest/logs`, {
       method: "POST",
-      headers: { "X-API-Key": loanKey },
+      headers: { Authorization: `Bearer ${loanKey}` },
       body: JSON.stringify({
         projectKey: loanProject.projectKey,
         serviceName: loanService.name,
@@ -103,7 +105,7 @@ async function main() {
     });
     await request(`${gateway}/metrics-api/metrics/batch`, {
       method: "POST",
-      headers: { "X-API-Key": loanKey },
+      headers: { Authorization: `Bearer ${loanKey}` },
       body: JSON.stringify({
         projectKey: loanProject.projectKey,
         serviceName: loanService.name,
@@ -123,7 +125,7 @@ async function main() {
     const timestamp = new Date(now.getTime() - index * 45_000).toISOString();
     await request(`${gateway}/metrics-api/metrics/batch`, {
       method: "POST",
-      headers: { "X-API-Key": commerceKey },
+      headers: { Authorization: `Bearer ${commerceKey}` },
       body: JSON.stringify({
         projectKey: commerceProject.projectKey,
         serviceName: service.name,

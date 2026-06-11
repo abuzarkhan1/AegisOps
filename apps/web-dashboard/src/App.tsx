@@ -10,11 +10,13 @@ import { NotificationsPage } from "./features/notifications/NotificationsPage";
 import { OverviewPage } from "./features/overview/OverviewPage";
 import { ProjectsPage } from "./features/projects/ProjectsPage";
 import { AlertRulesPage } from "./features/alerts/AlertRulesPage";
+import { ConnectProjectPage } from "./features/connect/ConnectProjectPage";
 import { ServicesPage } from "./features/services/ServicesPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ReportsPage } from "./features/reports/ReportsPage";
 import { TeamMembersPage } from "./features/team/TeamMembersPage";
 import { ShellLayout } from "./layouts/ShellLayout";
+import { navigationItems } from "./app/navigation";
 import { fetchHealthTarget } from "./shared/api/health";
 import type { HealthResult, HealthState } from "./shared/api/health";
 
@@ -23,9 +25,29 @@ const healthTargets = [
   { name: "Core API", url: `${coreApiUrl}/health`, icon: RadioTower }
 ];
 
+const navPath = (label: string, path?: string) =>
+  path ?? (label === "Overview" ? "/" : `/${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`);
+const navByPath = Object.fromEntries(navigationItems.map((item) => [navPath(item.label, item.path), item.label]));
+const labelFromLocation = () => navByPath[window.location.pathname] ?? "Overview";
+
 function App() {
-  const [activeNav, setActiveNav] = useState("Overview");
+  const [activeNav, setActiveNav] = useState(labelFromLocation);
   const [health, setHealth] = useState<Record<string, HealthResult>>({});
+
+  const handleNavChange = (label: string) => {
+    const item = navigationItems.find((navItem) => navItem.label === label);
+    const path = navPath(label, item?.path);
+    setActiveNav(label);
+    if (window.location.pathname !== path) {
+      window.history.pushState(null, "", path);
+    }
+  };
+
+  useEffect(() => {
+    const onPopState = () => setActiveNav(labelFromLocation());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -53,8 +75,9 @@ function App() {
   const shellStatus: HealthState = healthyCount === healthTargets.length ? "ok" : "degraded";
 
   return (
-    <ShellLayout activeNav={activeNav} onNavChange={setActiveNav} status={shellStatus}>
-      {activeNav === "Overview" ? <OverviewPage health={health} /> : null}
+    <ShellLayout activeNav={activeNav} onNavChange={handleNavChange} status={shellStatus}>
+      {activeNav === "Overview" ? <OverviewPage health={health} onNavigate={handleNavChange} /> : null}
+      {activeNav === "Connect Project" ? <ConnectProjectPage onNavigate={handleNavChange} /> : null}
       {activeNav === "Projects" ? <ProjectsPage /> : null}
       {activeNav === "Services" ? <ServicesPage /> : null}
       {activeNav === "Alert Rules" ? <AlertRulesPage /> : null}
