@@ -168,6 +168,23 @@ export async function evaluateAlertRules(input: AlertEvaluationInput) {
           message: `Alert rule ${rule.name} triggered this incident.`,
           metadata: { ruleId: rule.id, metric: rule.metric, operator: rule.operator, value, threshold: rule.threshold }
         });
+        await platformRepository.createIncidentEvidence({
+          incidentId: incident.id,
+          evidenceType: "metric",
+          title: rule.name,
+          payload: {
+            ruleId: rule.id,
+            metric: rule.metric,
+            operator: rule.operator,
+            value,
+            threshold: rule.threshold,
+            serviceName: input.serviceName,
+            environment: input.environment,
+            metrics: input.metrics,
+            healthStatus: input.healthStatus,
+            timestamp: input.timestamp ?? new Date().toISOString()
+          }
+        });
         await platformRepository.audit({
           organizationId: input.organizationId,
           action: "alert_rule.triggered",

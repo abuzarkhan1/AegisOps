@@ -42,8 +42,7 @@ export function DeploymentsPage() {
     try {
       const result = await fetchDeploymentImpact(deploymentId);
       setImpact(result);
-    } catch (err) {
-      console.error(err);
+    } catch {
       setImpact(null);
     } finally {
       setLoadingImpact(false);
@@ -68,7 +67,7 @@ export function DeploymentsPage() {
           <button
             onClick={loadDeployments}
             disabled={loading}
-            className="p-2 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white"
+            className="p-2 rounded-md hover:bg-panel-hover text-slate-400 hover:text-white"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -85,13 +84,13 @@ export function DeploymentsPage() {
                 onClick={() => setSelectedDeployment(dep)}
                 className={`cursor-pointer rounded-lg border p-4 transition text-left ${
                   active
-                    ? "border-mint/50 bg-[#0d2220]/60"
-                    : "border-line bg-[#0d1419] hover:border-slate-700 hover:bg-slate-800/40"
+                    ? "border-mint/50 bg-mint/10"
+                    : "border-line bg-panel-soft hover:border-line hover:bg-panel-hover"
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <p className="truncate text-sm font-semibold text-white">{dep.serviceName}</p>
-                  <span className="rounded bg-slate-800 border border-line px-1.5 py-0.5 text-[10px] font-mono shrink-0 text-slate-300">
+                  <span className="rounded bg-panel-hover border border-line px-1.5 py-0.5 text-[10px] font-mono shrink-0 text-slate-300">
                     {dep.version || "v?"}
                   </span>
                 </div>
@@ -120,7 +119,7 @@ export function DeploymentsPage() {
               <div>
                 <div className="flex items-center gap-3">
                   <h2 className="text-xl font-bold text-white">Deployment: {selectedDeployment.serviceName}</h2>
-                  <span className="rounded-md border border-line bg-slate-850 px-2.5 py-0.5 text-xs text-slate-300 font-mono">
+                  <span className="rounded-md border border-line bg-panel-soft px-2.5 py-0.5 text-xs text-slate-300 font-mono">
                     {selectedDeployment.version || "unknown-version"}
                   </span>
                 </div>
@@ -128,17 +127,17 @@ export function DeploymentsPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="rounded border border-line px-3 py-1.5 bg-[#0d1419] text-xs font-mono text-slate-400">
+                <span className="rounded border border-line px-3 py-1.5 bg-panel-soft text-xs font-mono text-slate-400">
                   Env: {selectedDeployment.environment}
                 </span>
-                <span className="rounded border border-line px-3 py-1.5 bg-[#0d1419] text-xs text-slate-400">
+                <span className="rounded border border-line px-3 py-1.5 bg-panel-soft text-xs text-slate-400">
                   Author: {selectedDeployment.deployedBy || "Webhook"}
                 </span>
               </div>
             </div>
 
             {/* Commit details */}
-            <div className="rounded-lg border border-line bg-[#0d1419] p-4 flex justify-between items-center gap-4">
+            <div className="rounded-lg border border-line bg-panel-soft p-4 flex justify-between items-center gap-4">
               <div className="flex items-center gap-3">
                 <GitBranch className="h-5 w-5 text-mint" />
                 <div>
@@ -174,7 +173,7 @@ export function DeploymentsPage() {
                   <div>
                     <h4 className="text-xs font-bold uppercase text-slate-400 mb-2">Pre vs. Post Deployment Metrics Comparison (30m window)</h4>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="rounded border border-line bg-[#0d1419] p-4">
+                      <div className="rounded border border-line bg-panel-soft p-4">
                         <span className="text-xs font-bold text-slate-400 block mb-2">API Error Rate</span>
                         <div className="flex items-center justify-between">
                           <div className="text-slate-300 text-xs">Before: <span className="font-semibold">{impact.beforeMetrics?.errorRate}%</span></div>
@@ -183,7 +182,7 @@ export function DeploymentsPage() {
                         </div>
                       </div>
 
-                      <div className="rounded border border-line bg-[#0d1419] p-4">
+                      <div className="rounded border border-line bg-panel-soft p-4">
                         <span className="text-xs font-bold text-slate-400 block mb-2">Tail Latency (P95)</span>
                         <div className="flex items-center justify-between">
                           <div className="text-slate-300 text-xs">Before: <span className="font-semibold">{impact.beforeMetrics?.p95LatencyMs || impact.beforeMetrics?.avgLatencyMs}ms</span></div>

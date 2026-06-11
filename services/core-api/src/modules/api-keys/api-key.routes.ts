@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../shared/http/asyncHandler";
-import { notFound } from "../../shared/http/errors";
+import { HttpError, notFound } from "../../shared/http/errors";
 import { optionalString, requiredString } from "../../shared/http/requestValidation";
 import { cache } from "../../infrastructure/redis/cache";
 import { sha256 } from "../../shared/security/crypto";
@@ -12,6 +12,10 @@ export const apiKeyRouter = Router();
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const apiKeyContextCacheKey = (keyHash: string) => `api-key:${keyHash}:context`;
+const publicApiKey = <T extends { keyHash?: string }>(apiKey: T) => {
+  const { keyHash: _keyHash, ...publicRecord } = apiKey;
+  return publicRecord;
+};
 
 const cacheValidationContext = async (
   keyHash: string,
@@ -54,7 +58,7 @@ apiKeyRouter.post(
       resourceId: apiKey.id,
       metadata: { serviceId: service.id, prefix: apiKey.prefix }
     });
-    res.status(201).json({ apiKey });
+    res.status(201).json({ apiKey: publicApiKey(apiKey) });
   })
 );
 
@@ -82,7 +86,7 @@ apiKeyRouter.post(
       resourceId: apiKey.id,
       metadata: { serviceId: apiKey.serviceId, prefix: apiKey.prefix }
     });
-    res.status(201).json({ apiKey });
+    res.status(201).json({ apiKey: publicApiKey(apiKey) });
   })
 );
 
@@ -90,7 +94,8 @@ apiKeyRouter.get(
   "/api-keys",
   asyncHandler(async (req, res) => {
     const organizationId = typeof req.query.organizationId === "string" ? req.query.organizationId : undefined;
-    res.json({ apiKeys: await platformRepository.listApiKeys(undefined, organizationId) });
+    const serviceId = typeof req.query.serviceId === "string" ? req.query.serviceId : undefined;
+    res.json({ apiKeys: await platformRepository.listApiKeys(serviceId, organizationId) });
   })
 );
 
@@ -224,5 +229,39 @@ apiKeyRouter.delete(
       metadata: { prefix: apiKey.prefix }
     });
     res.status(204).send();
+  })
+);
+
+apiKeyRouter.post(
+  "/api-keys/:apiKeyId/rotate",
+  asyncHandler(async (req, res) => {
+    const existing = await platformRepository.getApiKey(req.params.apiKeyId);
+    if (!existing) throw notFound("API key");
+    if (existing.status !== "active" || existing.revokedAt) {
+      throw new HttpError(409, "Only active API keys can be rotated");
+    }
+
+    const rotated = await apiKeyService.rotate(existing);
+    if (!rotated) throw new HttpError(409, "API key could not be rotated");
+
+    await cache.delete(apiKeyContextCacheKey(existing.keyHash));
+    await cache.delete(redisKeyPatterns.orgApiKey(existing.organizationId, existing.keyHash));
+    await platformRepository.audit({
+      organizationId: existing.organizationId,
+      action: "api_key.rotated",
+      resourceType: "api_key",
+      resourceId: rotated.apiKey.id,
+      metadata: {
+        previousApiKeyId: existing.id,
+        previousPrefix: existing.prefix,
+        prefix: rotated.apiKey.prefix,
+        serviceId: existing.serviceId
+      }
+    });
+
+    res.json({
+      apiKey: publicApiKey(rotated.apiKey),
+      revokedApiKey: publicApiKey(rotated.revokedApiKey)
+    });
   })
 );

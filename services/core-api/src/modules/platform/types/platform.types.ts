@@ -1,9 +1,18 @@
 export type UserRole = "owner" | "admin" | "engineer" | "viewer";
 export type UserStatus = "active" | "inactive";
 export type IncidentSeverity = "low" | "medium" | "high" | "critical";
-export type IncidentStatus = "open" | "investigating" | "identified" | "monitoring" | "resolved";
+export type IncidentStatus = "open" | "investigating" | "identified" | "monitoring" | "resolved" | "closed";
 export type AlertOperator = "gt" | "lt" | "gte" | "lte" | "eq";
 export type ApiKeyStatus = "active" | "revoked";
+export type ReportType =
+  | "daily_reliability"
+  | "weekly_reliability"
+  | "incident_report"
+  | "sla_report"
+  | "service_health"
+  | "deployment_impact"
+  | "ai_postmortem"
+  | "project_monitoring";
 export type ServiceType =
   | "api"
   | "frontend"
@@ -119,6 +128,24 @@ export type AuditLog = {
   action: string;
   resourceType: string;
   resourceId?: string;
+  status?: string;
+  ipAddress?: string;
   metadata: Record<string, unknown>;
   createdAt: string;
+};
+
+export type Report = {
+  id: string;
+  organizationId: string;
+  projectId?: string;
+  serviceId?: string;
+  reportType: ReportType;
+  title: string;
+  status: "generated" | "scheduled" | "failed";
+  periodStart: string;
+  periodEnd: string;
+  generatedBy?: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 };

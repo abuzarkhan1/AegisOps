@@ -14,10 +14,39 @@ export type ServiceRecord = {
 
 export type IncidentRecord = {
   id: string;
+  organizationId?: string;
+  projectId?: string;
+  serviceId?: string;
   title: string;
   severity: string;
   status: string;
+  assigneeId?: string;
   summary?: string;
+  createdAt: string;
+  updatedAt?: string;
+  resolvedAt?: string;
+};
+
+export type IncidentEvidenceRecord = {
+  id: string;
+  incidentId: string;
+  evidenceType: string;
+  sourceId?: string;
+  title?: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type IncidentAnalysisRecord = {
+  id: string;
+  incidentId: string;
+  summary: string;
+  likelyRootCause: string;
+  confidenceScore: number;
+  evidence: string[];
+  recommendedActions: string[];
+  rollbackRecommendation?: string;
+  postmortemDraft?: string;
   createdAt: string;
 };
 
@@ -58,6 +87,22 @@ export type ServiceConnectionStatus = {
     metrics?: string;
     alerts?: string;
   };
+};
+
+export type ApiKeyRecord = {
+  id: string;
+  organizationId: string;
+  serviceId?: string;
+  name: string;
+  prefix: string;
+  status: "active" | "revoked" | string;
+  lastUsedAt?: string;
+  createdAt: string;
+  revokedAt?: string;
+};
+
+export type ApiKeyWithSecret = ApiKeyRecord & {
+  rawKey: string;
 };
 
 export type AlertRuleRecord = {
@@ -105,6 +150,49 @@ export type NotificationHistoryRecord = {
   subject: string;
   destination: string;
   createdAt: string;
+};
+
+export type AuditLogRecord = {
+  id: string;
+  organizationId?: string;
+  actorId?: string;
+  action: string;
+  resourceType: string;
+  resourceId?: string;
+  status?: string;
+  ipAddress?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type ReportRecord = {
+  id: string;
+  organizationId: string;
+  projectId?: string;
+  serviceId?: string;
+  reportType: string;
+  title: string;
+  status: string;
+  periodStart: string;
+  periodEnd: string;
+  generatedBy?: string;
+  payload: {
+    summary?: Record<string, number | string>;
+    telemetrySummary?: Record<string, number | string>;
+    logSummary?: Record<string, number | string>;
+    incidentSummary?: Record<string, number | string>;
+    serviceHealth?: Record<string, number | string>;
+    topSlowRoutes?: RoutePerformanceRecord[];
+    topErroringServices?: Array<Record<string, number | string>>;
+    deploymentSummary?: Record<string, any>;
+    aiRecommendations?: Array<Record<string, any>>;
+    recommendations?: string[];
+    exports?: Record<string, string>;
+    scope?: Record<string, string | undefined>;
+    period?: Record<string, string>;
+  };
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type MetricRecord = {
@@ -204,7 +292,9 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     const body = await response.text();
     throw new Error(body || `Request failed with ${response.status}`);
   }
-  return (await response.json()) as T;
+  if (response.status === 204) return undefined as T;
+  const body = await response.text();
+  return (body ? JSON.parse(body) : undefined) as T;
 }
 
 export async function fetchServices() {
@@ -284,9 +374,43 @@ export async function fetchServiceDetailSummary(serviceId: string, params?: Reco
 }
 
 export async function createApiKey(serviceId: string, name: string) {
-  return request<{ apiKey: { id: string; rawKey: string; prefix: string } }>(`${coreApiUrl}/api/v1/services/${serviceId}/api-keys`, {
+  return request<{ apiKey: ApiKeyWithSecret }>(`${coreApiUrl}/api/v1/services/${serviceId}/api-keys`, {
     method: "POST",
     body: JSON.stringify({ name })
+  });
+}
+
+export async function createManagedApiKey(payload: { organizationId: string; serviceId?: string; name: string }) {
+  return request<{ apiKey: ApiKeyWithSecret }>(`${coreApiUrl}/api/api-keys`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function fetchApiKeys(params?: Record<string, string | undefined>) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value) query.set(key, value);
+  }
+  const data = await request<{ apiKeys: ApiKeyRecord[] }>(`${coreApiUrl}/api/api-keys${query.toString() ? `?${query}` : ""}`);
+  return data.apiKeys;
+}
+
+export async function fetchServiceApiKeys(serviceId: string) {
+  const data = await request<{ apiKeys: ApiKeyRecord[] }>(`${coreApiUrl}/api/v1/services/${serviceId}/api-keys`);
+  return data.apiKeys;
+}
+
+export async function rotateApiKey(apiKeyId: string) {
+  return request<{ apiKey: ApiKeyWithSecret; revokedApiKey: ApiKeyRecord }>(`${coreApiUrl}/api/api-keys/${apiKeyId}/rotate`, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export async function revokeApiKey(apiKeyId: string) {
+  return request<void>(`${coreApiUrl}/api/api-keys/${apiKeyId}`, {
+    method: "DELETE"
   });
 }
 
@@ -412,6 +536,17 @@ export async function fetchNotificationHistory() {
   return data.history;
 }
 
+export async function fetchAuditLogs(params?: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams();
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
+    }
+  }
+  const data = await request<{ auditLogs: AuditLogRecord[] }>(`${coreApiUrl}/api/audit-logs${query.toString() ? `?${query}` : ""}`);
+  return data.auditLogs;
+}
+
 export async function saveNotificationSetting(orgId: string, payload: Record<string, unknown>) {
   return request<Record<string, unknown>>(`${gatewayUrl}/notify/settings/${orgId}`, {
     method: "PATCH",
@@ -475,8 +610,27 @@ export async function fetchIncidentTimeline(incidentId: string) {
 }
 
 export async function fetchIncidentAnalysis(incidentId: string) {
-  const data = await request<{ analysis: any[]; status: string }>(`${coreApiUrl}/api/incidents/${incidentId}/ai-analysis`);
+  const data = await request<{ analysis: IncidentAnalysisRecord[]; status: string }>(`${coreApiUrl}/api/incidents/${incidentId}/ai-analysis`);
   return data;
+}
+
+export async function saveIncidentAnalysis(incidentId: string, payload: Record<string, unknown>) {
+  return request<{ incidentId: string; analysis: IncidentAnalysisRecord }>(`${coreApiUrl}/api/incidents/${incidentId}/ai-analysis`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function fetchIncidentEvidence(incidentId: string) {
+  const data = await request<{ evidence: IncidentEvidenceRecord[] }>(`${coreApiUrl}/api/incidents/${incidentId}/evidence`);
+  return data.evidence;
+}
+
+export async function addIncidentEvidence(incidentId: string, payload: Record<string, unknown>) {
+  return request<{ evidence: IncidentEvidenceRecord }>(`${coreApiUrl}/api/incidents/${incidentId}/evidence`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function fetchDeploymentImpact(deploymentId: string) {
@@ -488,6 +642,42 @@ export async function resolveIncident(incidentId: string) {
   return request<any>(`${coreApiUrl}/api/incidents/${incidentId}/resolve`, {
     method: "POST"
   });
+}
+
+async function incidentAction(incidentId: string, action: string, payload?: Record<string, unknown>) {
+  return request<{ incident: IncidentRecord }>(`${coreApiUrl}/api/incidents/${incidentId}/${action}`, {
+    method: "POST",
+    body: JSON.stringify(payload ?? {})
+  });
+}
+
+export async function acknowledgeIncident(incidentId: string, payload?: Record<string, unknown>) {
+  return incidentAction(incidentId, "acknowledge", payload);
+}
+
+export async function identifyIncident(incidentId: string, payload?: Record<string, unknown>) {
+  return incidentAction(incidentId, "identify", payload);
+}
+
+export async function monitorIncident(incidentId: string, payload?: Record<string, unknown>) {
+  return incidentAction(incidentId, "monitor", payload);
+}
+
+export async function reopenIncident(incidentId: string, payload?: Record<string, unknown>) {
+  return incidentAction(incidentId, "reopen", payload);
+}
+
+export async function closeIncident(incidentId: string, payload?: Record<string, unknown>) {
+  return incidentAction(incidentId, "close", payload);
+}
+
+export async function generateIncidentPostmortem(incidentId: string) {
+  return request<{ incidentId: string; postmortemDraft: string; analysis: IncidentAnalysisRecord }>(
+    `${coreApiUrl}/api/incidents/${incidentId}/postmortem`,
+    {
+      method: "POST"
+    }
+  );
 }
 
 export async function fetchRoutePerformance(projectId: string, serviceId?: string, params?: Record<string, string | number | undefined>) {
@@ -505,4 +695,24 @@ export async function fetchRoutePerformance(projectId: string, serviceId?: strin
     : `${coreApiUrl}/api/v1/projects/${projectId}/routes/performance${queryString ? `?${queryString}` : ""}`;
   const data = await request<{ performance: RoutePerformanceRecord[] }>(url);
   return data.performance;
+}
+
+export async function fetchReports(params?: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams();
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") {
+        query.set(key, String(value));
+      }
+    }
+  }
+  const data = await request<{ reports: ReportRecord[] }>(`${coreApiUrl}/api/reports${query.toString() ? `?${query}` : ""}`);
+  return data.reports;
+}
+
+export async function generateReport(payload: Record<string, unknown>) {
+  return request<{ report: ReportRecord }>(`${coreApiUrl}/api/reports/generate`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }

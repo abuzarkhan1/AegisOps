@@ -15,7 +15,7 @@ import { EmptyState } from "../../shared/ui/EmptyState";
 const severityClasses: Record<string, string> = {
   critical: "border-rose-500/40 bg-rose-500/10 text-rose-400",
   high: "border-amber-500/40 bg-amber-500/10 text-amber-400",
-  medium: "border-sky-400/40 bg-sky-400/10 text-sky-400",
+  medium: "border-mint/40 bg-mint/10 text-mint",
   low: "border-mint/40 bg-mint/10 text-mint"
 };
 
@@ -107,31 +107,31 @@ export function AlertRulesPage() {
           <ActivitySquare className="h-5 w-5 text-amber" />
         </div>
         <div className="grid gap-3">
-          <input name="name" required placeholder="Rule name" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" />
-          <select name="serviceId" value={selectedServiceId} onChange={(event) => setSelectedServiceId(event.target.value)} className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm">
+          <input name="name" required placeholder="Rule name" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
+          <select name="serviceId" value={selectedServiceId} onChange={(event) => setSelectedServiceId(event.target.value)} className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
             {services.map((service) => (
               <option key={service.id} value={service.id}>{service.name}</option>
             ))}
           </select>
           <div className="grid gap-3 sm:grid-cols-2">
-            <select name="metric" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm">
+            <select name="metric" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
               <option value="error_rate">error_rate</option>
               <option value="latency">latency</option>
               <option value="cpu">cpu</option>
               <option value="memory">memory</option>
               <option value="service_health">service_health</option>
             </select>
-            <select name="operator" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm">
+            <select name="operator" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
               <option value="gt">gt</option>
               <option value="gte">gte</option>
               <option value="lt">lt</option>
               <option value="lte">lte</option>
               <option value="eq">eq</option>
             </select>
-            <input name="threshold" type="number" step="0.01" defaultValue={5} className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" />
-            <input name="durationSeconds" type="number" defaultValue={300} className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" />
+            <input name="threshold" type="number" step="0.01" defaultValue={5} className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
+            <input name="durationSeconds" type="number" defaultValue={300} className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
           </div>
-          <select name="severity" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm">
+          <select name="severity" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
             <option value="critical">critical</option>
             <option value="high">high</option>
             <option value="medium">medium</option>
@@ -149,7 +149,7 @@ export function AlertRulesPage() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-white">Rules</h3>
             <div className="flex gap-2">
-              <button onClick={() => load()} title="Refresh" className="grid h-9 w-9 place-items-center rounded-md border border-line bg-[#0d1419] text-slate-300">
+              <button onClick={() => load()} title="Refresh" className="grid h-9 w-9 place-items-center rounded-md border border-line bg-panel-soft text-slate-300">
                 <RefreshCw className="h-4 w-4" />
               </button>
               <button onClick={runEvaluation} className="inline-flex h-9 items-center gap-2 rounded-md bg-mint px-3 text-xs font-semibold text-slate-950">
@@ -160,7 +160,7 @@ export function AlertRulesPage() {
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {rules.map((rule) => (
-              <div key={rule.id} className="rounded-lg border border-line bg-[#0d1419] p-4">
+              <div key={rule.id} className="rounded-lg border border-line bg-panel-soft p-4">
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-white">{rule.name}</p>
@@ -179,7 +179,7 @@ export function AlertRulesPage() {
 
         {status ? <p className="text-sm text-slate-300">{status}</p> : null}
         {evaluation ? (
-          <pre className="max-h-60 overflow-auto rounded-lg border border-line bg-[#0d1419] p-4 text-xs text-slate-300">
+          <pre className="max-h-60 overflow-auto rounded-lg border border-line bg-panel-soft p-4 text-xs text-slate-300">
             {JSON.stringify(evaluation, null, 2)}
           </pre>
         ) : null}

@@ -35,7 +35,7 @@ export function ServicesPage() {
           <div
             key={service.id}
             onClick={() => setSelectedServiceId(service.id)}
-            className="rounded-lg border border-line bg-[#0d1419] p-4 cursor-pointer hover:border-slate-700 transition-all flex flex-col justify-between"
+            className="rounded-lg border border-line bg-panel-soft p-4 cursor-pointer hover:border-line transition-all flex flex-col justify-between"
           >
             <div>
               <div className="mb-3 flex items-center justify-between gap-3">

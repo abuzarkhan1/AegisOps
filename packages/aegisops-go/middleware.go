@@ -13,7 +13,7 @@ import (
 
 type responseRecorder struct {
 	http.ResponseWriter
-	statusCode int
+	statusCode  int
 	wroteHeader bool
 }
 

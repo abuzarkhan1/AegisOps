@@ -52,9 +52,9 @@ export function TeamMembersPage() {
           <UsersRound className="h-5 w-5 text-mint" />
         </div>
         <div className="grid gap-3">
-          <input name="email" required type="email" placeholder="Email" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" />
-          <input name="name" placeholder="Name" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" />
-          <select name="role" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm">
+          <input name="email" required type="email" placeholder="Email" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
+          <input name="name" placeholder="Name" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
+          <select name="role" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
             <option value="admin">admin</option>
             <option value="engineer">engineer</option>
             <option value="viewer">viewer</option>
@@ -88,7 +88,7 @@ export function TeamMembersPage() {
                   <td className="py-3 pr-4 font-medium text-white">{member.name}</td>
                   <td className="py-3 pr-4 text-slate-300">{member.email}</td>
                   <td className="py-3 pr-4">
-                    <span className="rounded-md border border-line bg-[#0d1419] px-2 py-1 text-xs text-slate-300">{member.memberRole}</span>
+                    <span className="rounded-md border border-line bg-panel-soft px-2 py-1 text-xs text-slate-300">{member.memberRole}</span>
                   </td>
                   <td className="py-3 text-xs text-slate-500">{new Date(member.invitedAt).toLocaleString()}</td>
                 </tr>

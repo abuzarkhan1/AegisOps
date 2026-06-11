@@ -34,3 +34,13 @@ AEGISOPS_ENVIRONMENT=production
 ```
 
 The SDK batches metrics, retries failed sends, adds request/trace IDs, and never lets telemetry failures crash the monitored app.
+Spring-style properties are supported through `AegisOpsConfig.fromProperties(properties)`.
+
+Run the example service:
+
+```bash
+cd packages/aegisops-java && mvn install
+cd ../../examples/springboot-service
+cp src/main/resources/application.properties.example src/main/resources/application.properties
+mvn spring-boot:run
+```

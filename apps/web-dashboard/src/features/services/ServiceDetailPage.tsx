@@ -113,8 +113,8 @@ export function ServiceDetailPage({ serviceId, onBack }: ServiceDetailPageProps)
       setMetrics(allMetrics || []);
       setSummary({ ...emptySummary, ...detailSummary });
       setLatencyAggregates(aggregates || []);
-    } catch (error) {
-      console.error("Failed to load service details:", error);
+    } catch {
+      setSummary(emptySummary);
     } finally {
       setLoading(false);
     }
@@ -168,7 +168,7 @@ export function ServiceDetailPage({ serviceId, onBack }: ServiceDetailPageProps)
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-white">{service?.name}</h1>
-              <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-mint">
+              <span className="rounded-full bg-panel-hover px-2.5 py-0.5 text-xs font-semibold text-mint">
                 {service?.serviceType || "api"}
               </span>
             </div>
@@ -330,14 +330,14 @@ export function ServiceDetailPage({ serviceId, onBack }: ServiceDetailPageProps)
       <div className="grid gap-6 md:grid-cols-2">
         <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
           <h3 className="mb-4 text-sm font-semibold text-white">Throughput Over Time (req/s)</h3>
-          <div className="flex h-36 items-end gap-2 rounded bg-[#0d1419] p-3">
+          <div className="flex h-36 items-end gap-2 rounded bg-panel-soft p-3">
             {trendData.map((d, i) => (
               <div key={i} className="flex h-full flex-1 flex-col justify-end items-center group relative">
                 <div
                   style={{ height: `${(d.throughput / maxThroughput) * 100}%` }}
                   className="w-full rounded bg-mint/80 hover:bg-mint transition-colors"
                 />
-                <span className="absolute bottom-full mb-1 scale-0 rounded bg-slate-900 px-2 py-1 text-[10px] text-white group-hover:scale-100 transition-all z-10">
+                <span className="absolute bottom-full mb-1 scale-0 rounded bg-panel-soft px-2 py-1 text-[10px] text-white group-hover:scale-100 transition-all z-10">
                   {d.throughput} req/s
                 </span>
               </div>
@@ -347,7 +347,7 @@ export function ServiceDetailPage({ serviceId, onBack }: ServiceDetailPageProps)
 
         <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
           <h3 className="mb-4 text-sm font-semibold text-white">Latency p50/p95/p99 (ms)</h3>
-          <div className="flex h-36 items-end gap-2 rounded bg-[#0d1419] p-3">
+          <div className="flex h-36 items-end gap-2 rounded bg-panel-soft p-3">
             {trendData.map((d, i) => (
               <div key={i} className="flex h-full flex-1 flex-col justify-end items-center group relative">
                 {/* Draw p99 as a tall segment, p95 as medium, p50 as base */}
@@ -357,7 +357,7 @@ export function ServiceDetailPage({ serviceId, onBack }: ServiceDetailPageProps)
                     className="w-full rounded bg-[#e11d48]/80 hover:bg-[#e11d48]"
                   />
                 </div>
-                <span className="absolute bottom-full mb-1 scale-0 rounded bg-slate-900 px-2 py-1 text-[10px] text-white group-hover:scale-100 transition-all z-10">
+                <span className="absolute bottom-full mb-1 scale-0 rounded bg-panel-soft px-2 py-1 text-[10px] text-white group-hover:scale-100 transition-all z-10">
                   p50:{d.p50} / p95:{d.p95} / p99:{d.p99} ms
                 </span>
               </div>
@@ -389,13 +389,13 @@ export function ServiceDetailPage({ serviceId, onBack }: ServiceDetailPageProps)
                 </thead>
                 <tbody className="divide-y divide-line">
                   {routePerformance.map((route, i) => (
-                    <tr key={i} className="hover:bg-slate-900/50">
+                    <tr key={i} className="hover:bg-panel-soft/50">
                       <td className="py-3 font-mono text-xs text-slate-200">{route.route}</td>
                       <td className="py-3">
                         <span
                           className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${
                             route.method === "POST"
-                              ? "bg-sky-500/15 text-sky-400"
+                              ? "bg-mint/15 text-mint"
                               : "bg-emerald-500/15 text-emerald-400"
                           }`}
                         >
@@ -436,7 +436,7 @@ export function ServiceDetailPage({ serviceId, onBack }: ServiceDetailPageProps)
                   <span className="text-slate-500">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
                   <span
                     className={`font-semibold uppercase ${
-                      log.level === "error" ? "text-red-400" : log.level === "warn" ? "text-amber" : "text-sky-400"
+                      log.level === "error" ? "text-red-400" : log.level === "warn" ? "text-amber" : "text-mint"
                     }`}
                   >
                     {log.level}
@@ -455,7 +455,7 @@ export function ServiceDetailPage({ serviceId, onBack }: ServiceDetailPageProps)
             <h3 className="mb-4 text-sm font-semibold text-white">Active Service Incidents</h3>
             <div className="space-y-3">
               {activeIncidents.map((incident) => (
-                <div key={incident.id} className="rounded border border-line bg-[#0d1419] p-3">
+                <div key={incident.id} className="rounded border border-line bg-panel-soft p-3">
                   <p className="text-xs font-semibold text-white">{incident.title}</p>
                   <p className="mt-1 text-[11px] text-slate-400">{incident.summary}</p>
                   <p className="mt-2 text-[10px] text-slate-500">{new Date(incident.createdAt).toLocaleTimeString()}</p>
@@ -495,7 +495,7 @@ export function ServiceDetailPage({ serviceId, onBack }: ServiceDetailPageProps)
             <div className="space-y-3">
               {deployments.map((d) => (
                 <div key={d.id} className="flex items-start gap-2 text-xs">
-                  <GitBranch className="h-4 w-4 mt-0.5 text-sky-400" />
+                  <GitBranch className="h-4 w-4 mt-0.5 text-mint" />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-white truncate">{d.version || "v1.0.1"}</p>
                     <p className="text-[10px] text-slate-400 font-mono">commit {d.commitSha?.slice(0, 6)}</p>

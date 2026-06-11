@@ -20,6 +20,23 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() not in {"0", "false", "no", "off"}
 
 
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return default
+    try:
+        return int(value.strip())
+    except ValueError:
+        return default
+
+
+def _env_list(name: str, default: List[str]) -> List[str]:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return default
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -51,6 +68,11 @@ class AegisOpsConfig:
             project_key=os.getenv("AEGISOPS_PROJECT_KEY"),
             service_name=os.getenv("AEGISOPS_SERVICE_NAME"),
             environment=os.getenv("AEGISOPS_ENVIRONMENT", os.getenv("ENVIRONMENT", "development")),
+            ignored_routes=_env_list("AEGISOPS_IGNORED_ROUTES", ["/health", "/metrics", "/favicon.ico"]),
+            slow_request_threshold_ms=_env_int("AEGISOPS_SLOW_REQUEST_THRESHOLD_MS", 1000),
+            flush_interval_ms=_env_int("AEGISOPS_FLUSH_INTERVAL_MS", 5000),
+            batch_size=_env_int("AEGISOPS_BATCH_SIZE", 20),
+            debug=_env_bool("AEGISOPS_DEBUG", False),
         )
 
 

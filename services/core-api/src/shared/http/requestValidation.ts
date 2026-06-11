@@ -54,7 +54,8 @@ export const incidentStatus = (value: unknown): IncidentStatus | undefined => {
     value === "investigating" ||
     value === "identified" ||
     value === "monitoring" ||
-    value === "resolved"
+    value === "resolved" ||
+    value === "closed"
   ) {
     return value;
   }

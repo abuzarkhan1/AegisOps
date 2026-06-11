@@ -1,8 +1,8 @@
 import type { HealthState } from "../api/health";
 
 const statusClasses: Record<HealthState, string> = {
-  loading: "border-slate-600 bg-slate-800 text-slate-300",
-  ok: "border-mint/40 bg-mint/10 text-mint",
+  loading: "border-line bg-panel-soft text-slate-300",
+  ok: "border-success/40 bg-success/10 text-success",
   degraded: "border-amber/40 bg-amber/10 text-amber",
   offline: "border-rose/40 bg-rose/10 text-rose"
 };
@@ -14,4 +14,3 @@ export function StatusPill({ status }: { status: HealthState }) {
     </span>
   );
 }
-

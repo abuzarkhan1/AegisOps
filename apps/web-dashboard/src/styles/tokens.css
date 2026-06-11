@@ -1,0 +1,63 @@
+:root {
+  color-scheme: dark;
+
+  --x-bg: #000000;
+  --x-bg-rgb: 0 0 0;
+  --x-bg-soft: #050505;
+  --x-bg-soft-rgb: 5 5 5;
+  --x-surface: #080808;
+  --x-surface-rgb: 8 8 8;
+  --x-surface-2: #0f1419;
+  --x-surface-2-rgb: 15 20 25;
+  --x-surface-3: #16181c;
+  --x-surface-3-rgb: 22 24 28;
+
+  --x-border: #2f3336;
+  --x-border-rgb: 47 51 54;
+  --x-border-soft: #1d1f23;
+  --x-border-soft-rgb: 29 31 35;
+  --x-border-strong: #3a3f44;
+
+  --x-text: #e7e9ea;
+  --x-text-strong: #ffffff;
+  --x-text-muted: #71767b;
+  --x-text-soft: #aab8c2;
+
+  --x-blue: #1d9bf0;
+  --x-blue-rgb: 29 155 240;
+  --x-blue-hover: #1a8cd8;
+  --x-blue-soft: rgba(29, 155, 240, 0.12);
+  --x-blue-border: rgba(29, 155, 240, 0.35);
+
+  --x-green: #00ba7c;
+  --x-green-rgb: 0 186 124;
+  --x-green-soft: rgba(0, 186, 124, 0.12);
+  --x-green-border: rgba(0, 186, 124, 0.35);
+
+  --x-yellow: #ffd400;
+  --x-yellow-rgb: 255 212 0;
+  --x-yellow-soft: rgba(255, 212, 0, 0.12);
+  --x-yellow-border: rgba(255, 212, 0, 0.35);
+
+  --x-orange: #ff7a00;
+  --x-orange-rgb: 255 122 0;
+  --x-orange-soft: rgba(255, 122, 0, 0.12);
+  --x-orange-border: rgba(255, 122, 0, 0.35);
+
+  --x-red: #f4212e;
+  --x-red-rgb: 244 33 46;
+  --x-red-soft: rgba(244, 33, 46, 0.12);
+  --x-red-border: rgba(244, 33, 46, 0.35);
+
+  --x-purple: #7856ff;
+  --x-purple-rgb: 120 86 255;
+  --x-purple-soft: rgba(120, 86, 255, 0.12);
+  --x-purple-border: rgba(120, 86, 255, 0.35);
+
+  --x-code-bg: #0b0f14;
+  --x-code-bg-rgb: 11 15 20;
+  --x-code-border: #26313a;
+
+  --font-sans: Inter, Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}

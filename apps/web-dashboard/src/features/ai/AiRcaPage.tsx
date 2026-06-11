@@ -50,14 +50,14 @@ export function AiRcaPage() {
         <BrainCircuit className="h-5 w-5 text-amber" aria-hidden="true" />
       </div>
       <div className="grid gap-3 md:grid-cols-[160px_180px_1fr_auto]">
-        <input className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={incidentId} onChange={(event) => setIncidentId(event.target.value)} />
-        <input className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={serviceName} onChange={(event) => setServiceName(event.target.value)} />
-        <input className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={message} onChange={(event) => setMessage(event.target.value)} />
+        <input className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" value={incidentId} onChange={(event) => setIncidentId(event.target.value)} />
+        <input className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" value={serviceName} onChange={(event) => setServiceName(event.target.value)} />
+        <input className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" value={message} onChange={(event) => setMessage(event.target.value)} />
         <button className="h-10 rounded-md bg-amber px-4 text-sm font-medium text-slate-950" type="submit">Analyze</button>
       </div>
       {status ? <p className="mt-3 text-sm text-slate-300">{status}</p> : null}
       {result ? (
-        <pre className="mt-4 max-h-[460px] overflow-auto rounded-lg border border-line bg-[#0d1419] p-4 text-xs leading-5 text-slate-300">
+        <pre className="mt-4 max-h-[460px] overflow-auto rounded-lg border border-line bg-panel-soft p-4 text-xs leading-5 text-slate-300">
           {JSON.stringify(result, null, 2)}
         </pre>
       ) : null}

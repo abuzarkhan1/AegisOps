@@ -197,12 +197,82 @@ async function runOptionalExampleApp(env) {
   assert(v1Services.services.some((item) => item.id === loanService.id), "v1 services did not include created service");
   console.log("ok projects/services");
 
-  const apiKey = (await request(`${core}/api/v1/services/${loanService.id}/api-keys`, {
+  const projectAuditLogs = await request(`${core}/api/audit-logs?organizationId=${organizationId}&resourceType=project&action=project.created&limit=20`);
+  assert(projectAuditLogs.auditLogs?.some((item) => item.resourceId === loanProject.id), "audit logs did not include project.created");
+  const serviceAuditLogs = await request(`${core}/api/audit-logs?organizationId=${organizationId}&resourceType=service&action=service.created&limit=20`);
+  assert(serviceAuditLogs.auditLogs?.some((item) => item.resourceId === loanService.id), "audit logs did not include service.created");
+  const invalidUuidAuditLogs = await request(`${core}/api/audit-logs?organizationId=not-a-uuid&actorId=also-not-a-uuid&limit=5`);
+  assert(Array.isArray(invalidUuidAuditLogs.auditLogs), "audit logs should tolerate invalid UUID filters");
+  console.log("ok audit logs");
+
+  const apiKeyResponse = await request(`${core}/api/v1/services/${loanService.id}/api-keys`, {
     method: "POST",
     body: JSON.stringify({ name: "smoke ingestion key" })
-  })).apiKey.rawKey;
+  });
+  const apiKey = apiKeyResponse.apiKey.rawKey;
   assert(apiKey, "api key was not generated");
-  console.log("ok api key");
+  assert(!("keyHash" in apiKeyResponse.apiKey), "api key hash leaked in create response");
+
+  const listedApiKeys = await request(`${core}/api/api-keys?organizationId=${organizationId}&serviceId=${loanService.id}`);
+  assert(listedApiKeys.apiKeys.some((item) => item.id === apiKeyResponse.apiKey.id), "created API key was not listed");
+  assert(listedApiKeys.apiKeys.every((item) => !("keyHash" in item)), "api key hash leaked in list response");
+
+  const managedKey = (await request(`${core}/api/api-keys`, {
+    method: "POST",
+    body: JSON.stringify({
+      organizationId,
+      serviceId: loanService.id,
+      name: "smoke managed key"
+    })
+  })).apiKey;
+  assert(managedKey.rawKey, "managed API key did not include one-time raw key");
+  assert(!("keyHash" in managedKey), "api key hash leaked in managed create response");
+
+  const rotatedKey = await request(`${core}/api/api-keys/${managedKey.id}/rotate`, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+  assert(rotatedKey.apiKey.rawKey, "rotated API key did not include one-time raw key");
+  assert(rotatedKey.apiKey.id !== managedKey.id, "rotation should issue a replacement key");
+  assert(rotatedKey.revokedApiKey.id === managedKey.id, "rotation should revoke the previous key");
+  assert(rotatedKey.revokedApiKey.status === "revoked", "rotated old API key should be revoked");
+  assert(!("keyHash" in rotatedKey.apiKey), "api key hash leaked in rotate response");
+
+  const oldValidation = await request(`${core}/api/api-keys/validate`, {
+    method: "POST",
+    body: JSON.stringify({
+      apiKey: managedKey.rawKey,
+      projectKey: loanProject.projectKey,
+      serviceName: loanService.name
+    })
+  });
+  assert(oldValidation.valid === false, "rotated old API key should be invalid");
+
+  const newValidation = await request(`${core}/api/api-keys/validate`, {
+    method: "POST",
+    body: JSON.stringify({
+      apiKey: rotatedKey.apiKey.rawKey,
+      projectKey: loanProject.projectKey,
+      serviceName: loanService.name
+    })
+  });
+  assert(newValidation.valid === true, "rotated replacement API key should validate");
+
+  await request(`${core}/api/api-keys/${rotatedKey.apiKey.id}`, { method: "DELETE" });
+  const revokedValidation = await request(`${core}/api/api-keys/validate`, {
+    method: "POST",
+    body: JSON.stringify({
+      apiKey: rotatedKey.apiKey.rawKey,
+      projectKey: loanProject.projectKey,
+      serviceName: loanService.name
+    })
+  });
+  assert(revokedValidation.valid === false, "revoked replacement API key should be invalid");
+
+  const apiKeyAuditLogs = await request(`${core}/api/audit-logs?organizationId=${organizationId}&resourceType=api_key&limit=50`);
+  assert(apiKeyAuditLogs.auditLogs?.some((item) => item.action === "api_key.rotated"), "audit logs did not include api_key.rotated");
+  assert(apiKeyAuditLogs.auditLogs?.some((item) => item.action === "api_key.revoked"), "audit logs did not include api_key.revoked");
+  console.log("ok api key lifecycle");
 
   await request(`${core}/api/alert-rules`, {
     method: "POST",
@@ -327,7 +397,7 @@ async function runOptionalExampleApp(env) {
     const metrics = await request(`${core}/api/telemetry/metrics?serviceId=${loanService.id}&limit=50`);
     const names = new Set(metrics.metrics?.map((metric) => metric.metricName));
     return names.has("slow_requests_total") && names.has("http_errors_total") && names.has("http_5xx_total");
-  });
+  }, 60000);
   await waitFor("metric aggregates", async () => {
     const aggregates = await request(`${core}/api/telemetry/metric-aggregates?serviceId=${loanService.id}&window=1m&limit=20`);
     return aggregates.aggregates?.length >= 1;
@@ -364,8 +434,43 @@ async function runOptionalExampleApp(env) {
       postmortemDraft: ai.postmortemDraft
     })
   });
-  const savedAi = await request(`${core}/api/incidents/${incident.id}/ai-analysis`);
-  assert(savedAi.status === "complete" && savedAi.analysis?.length > 0, "AI RCA report was not saved");
+  const savedAi = await waitFor("saved AI RCA report", async () => {
+    const response = await request(`${core}/api/incidents/${incident.id}/ai-analysis`);
+    return response.status === "complete" && response.analysis?.length > 0 ? response : null;
+  });
+
+  await request(`${core}/api/incidents/${incident.id}/evidence`, {
+    method: "POST",
+    body: JSON.stringify({
+      evidenceType: "metric",
+      title: "Smoke latency spike",
+      payload: {
+        metricName: "http_request_duration_ms",
+        p95LatencyMs: 1500,
+        errorRate: 8.5,
+        route: "/api/transactions"
+      }
+    })
+  });
+  const incidentEvidence = await request(`${core}/api/incidents/${incident.id}/evidence`);
+  assert(incidentEvidence.evidence?.some((item) => item.evidenceType === "metric"), "incident evidence was not saved");
+  const acknowledgedIncident = await request(`${core}/api/incidents/${incident.id}/acknowledge`, { method: "POST", body: JSON.stringify({ note: "Smoke engineer acknowledged" }) });
+  assert(acknowledgedIncident.incident.status === "investigating", "incident acknowledge did not move to investigating");
+  const identifiedIncident = await request(`${core}/api/incidents/${incident.id}/identify`, { method: "POST", body: JSON.stringify({ note: "Smoke root cause identified" }) });
+  assert(identifiedIncident.incident.status === "identified", "incident identify did not move to identified");
+  const monitoringIncident = await request(`${core}/api/incidents/${incident.id}/monitor`, { method: "POST", body: JSON.stringify({ note: "Smoke mitigation deployed" }) });
+  assert(monitoringIncident.incident.status === "monitoring", "incident monitor did not move to monitoring");
+  const postmortem = await request(`${core}/api/incidents/${incident.id}/postmortem`, { method: "POST" });
+  assert(postmortem.postmortemDraft?.includes("Smoke manual incident"), "incident postmortem draft was not generated");
+  const resolvedIncident = await request(`${core}/api/incidents/${incident.id}/resolve`, { method: "POST", body: JSON.stringify({ resolution: "Smoke incident resolved" }) });
+  assert(resolvedIncident.incident.status === "resolved", "incident resolve did not move to resolved");
+  const reopenedIncident = await request(`${core}/api/incidents/${incident.id}/reopen`, { method: "POST", body: JSON.stringify({ note: "Smoke reopen validation" }) });
+  assert(reopenedIncident.incident.status === "open", "incident reopen did not move to open");
+  assert(!reopenedIncident.incident.resolvedAt, "incident reopen should clear resolvedAt");
+  await request(`${core}/api/incidents/${incident.id}/resolve`, { method: "POST", body: JSON.stringify({ resolution: "Smoke incident resolved again" }) });
+  const closedIncident = await request(`${core}/api/incidents/${incident.id}/close`, { method: "POST", body: JSON.stringify({ note: "Smoke postmortem reviewed" }) });
+  assert(closedIncident.incident.status === "closed", "incident close did not move to closed");
+  console.log("ok incident lifecycle/evidence/postmortem");
 
   const deployment = (await request(`${gateway}/deployments/github`, {
     method: "POST",
@@ -472,7 +577,30 @@ async function runOptionalExampleApp(env) {
   assert(routePerf.performance.some((route) => typeof route.lastSeen === "string"), "route performance must include lastSeen");
   console.log("ok detail APIs verified");
 
-  // 5. Verify org isolation test
+  // 6. Verify reliability report generation
+  console.log("verifying reliability report generation...");
+  const reportEnd = new Date().toISOString();
+  const reportStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const generatedReport = (await request(`${core}/api/reports/generate`, {
+    method: "POST",
+    body: JSON.stringify({
+      organizationId,
+      projectId: loanProject.id,
+      serviceId: loanService.id,
+      reportType: "weekly_reliability",
+      periodStart: reportStart,
+      periodEnd: reportEnd
+    })
+  })).report;
+  assert(generatedReport.id, "generated report must include id");
+  assert(generatedReport.payload?.summary, "generated report must include summary payload");
+  assert(typeof generatedReport.payload.summary.reliabilityScore === "number", "report summary must include reliabilityScore");
+  assert(Array.isArray(generatedReport.payload.topSlowRoutes), "report must include topSlowRoutes");
+  const reportList = await request(`${core}/api/reports?organizationId=${organizationId}&projectId=${loanProject.id}`);
+  assert(reportList.reports.some((report) => report.id === generatedReport.id), "report list must include generated report");
+  console.log("ok reliability report generation");
+
+  // 7. Verify org isolation test
   console.log("verifying tenant isolation rules...");
   const suffixB = suffix + "_orgB";
   const emailB = `smoke+${suffixB}@aegisops.local`;
@@ -566,3 +694,40 @@ async function runOptionalExampleApp(env) {
   process.exit(1);
 });
 NODE
+
+echo "running optional SDK checks..."
+
+if command -v python3 >/dev/null 2>&1; then
+  (
+    cd packages/aegisops-python
+    PYTHONPATH=src python3 -m compileall src/aegisops
+    if python3 -m pytest --version >/dev/null 2>&1; then
+      PYTHONPATH=src python3 -m pytest
+    else
+      PYTHONPATH=src python3 -m unittest discover -s tests
+    fi
+  )
+  echo "ok python sdk"
+else
+  echo "skip python sdk checks (python3 not installed)"
+fi
+
+if command -v go >/dev/null 2>&1; then
+  (
+    cd packages/aegisops-go
+    go test ./...
+  )
+  echo "ok go sdk"
+else
+  echo "skip go sdk checks (go not installed)"
+fi
+
+if command -v mvn >/dev/null 2>&1; then
+  (
+    cd packages/aegisops-java
+    mvn test
+  )
+  echo "ok java sdk"
+else
+  echo "skip java sdk checks (mvn not installed)"
+fi

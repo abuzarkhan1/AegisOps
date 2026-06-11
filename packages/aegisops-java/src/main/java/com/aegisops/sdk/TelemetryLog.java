@@ -16,6 +16,10 @@ public record TelemetryLog(
     String timestamp,
     Map<String, Object> metadata
 ) {
+    public static TelemetryLog info(String message, String traceId, String requestId, String route, String method, int statusCode, double durationMs, Map<String, Object> metadata) {
+        return new TelemetryLog("info", message, traceId, requestId, route, method, statusCode, durationMs, Instant.now().toString(), metadata);
+    }
+
     public static TelemetryLog error(String message, String traceId, String requestId, String route, String method, int statusCode, double durationMs, Map<String, Object> metadata) {
         return new TelemetryLog("error", message, traceId, requestId, route, method, statusCode, durationMs, Instant.now().toString(), metadata);
     }

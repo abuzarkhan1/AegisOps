@@ -119,14 +119,14 @@ export function ProjectsPage() {
             <FolderKanban className="h-5 w-5 text-mint" />
           </div>
           <div className="grid gap-3">
-            <input name="name" required placeholder="Project name" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" />
-            <input name="projectKey" placeholder="project-key" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" />
-            <select name="environment" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm">
+            <input name="name" required placeholder="Project name" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
+            <input name="projectKey" placeholder="project-key" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
+            <select name="environment" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
               <option value="dev">dev</option>
               <option value="staging">staging</option>
               <option value="production">production</option>
             </select>
-            <input name="description" placeholder="Description" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" />
+            <input name="description" placeholder="Description" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
             <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950">
               <Plus className="h-4 w-4" />
               Create Project
@@ -148,7 +148,7 @@ export function ProjectsPage() {
                   key={project.id}
                   onClick={() => setSelectedProjectId(project.id)}
                   className={`w-full rounded-md border p-3 text-left text-sm cursor-pointer transition-all ${
-                    selectedProjectId === project.id ? "border-mint/50 bg-mint/10" : "border-line bg-[#0d1419] hover:border-slate-700"
+                    selectedProjectId === project.id ? "border-mint/50 bg-mint/10" : "border-line bg-panel-soft hover:border-line"
                   }`}
                 >
                   <span className="block truncate font-medium text-white">{project.name}</span>
@@ -183,8 +183,8 @@ export function ProjectsPage() {
             <Server className="h-5 w-5 text-amber" />
           </div>
           <div className="grid gap-3 md:grid-cols-[1fr_140px_140px]">
-            <input name="name" required placeholder="Service name" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" />
-            <select name="serviceType" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm">
+            <input name="name" required placeholder="Service name" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
+            <select name="serviceType" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
               <option value="api">api</option>
               <option value="frontend">frontend</option>
               <option value="worker">worker</option>
@@ -195,13 +195,13 @@ export function ProjectsPage() {
               <option value="message-broker">message-broker</option>
               <option value="external">external</option>
             </select>
-            <select name="language" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm">
+            <select name="language" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
               <option value="node">node</option>
               <option value="go">go</option>
               <option value="python">python</option>
               <option value="java">java</option>
             </select>
-            <input name="repositoryUrl" placeholder="Repository URL" className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm md:col-span-2" />
+            <input name="repositoryUrl" placeholder="Repository URL" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm md:col-span-2" />
             <button disabled={!selectedProjectId} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber px-4 text-sm font-semibold text-slate-950 disabled:opacity-50">
               <Plus className="h-4 w-4" />
               Add Service
@@ -216,7 +216,7 @@ export function ProjectsPage() {
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {projectServices.map((service) => (
-              <div key={service.id} className="rounded-lg border border-line bg-[#0d1419] p-4">
+              <div key={service.id} className="rounded-lg border border-line bg-panel-soft p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <button
@@ -228,7 +228,7 @@ export function ProjectsPage() {
                     <p className="mt-1 text-xs text-slate-400">{service.serviceType ?? "api"} · {service.language ?? "runtime"}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button title="Generate API key" onClick={() => generateKey(service)} className="grid h-9 w-9 place-items-center rounded-md border border-line bg-slate-900 text-slate-300 hover:text-white">
+                    <button title="Generate API key" onClick={() => generateKey(service)} className="grid h-9 w-9 place-items-center rounded-md border border-line bg-panel-soft text-slate-300 hover:text-white">
                       <KeyRound className="h-4 w-4" />
                     </button>
                   </div>

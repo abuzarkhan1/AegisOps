@@ -52,6 +52,7 @@ public final class AegisOpsFilter implements Filter {
             chain.doFilter(request, wrapped);
         } catch (Throwable throwable) {
             double durationMs = durationMs(started);
+            wrapped.setStatus(500);
             Map<String, String> labels = labels(httpRequest.getMethod(), route, 500);
             client.sendMetric(new TelemetryMetric("exceptions_total", 1, labels));
             client.sendLog(TelemetryLog.error(

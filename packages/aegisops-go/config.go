@@ -8,23 +8,23 @@ import (
 )
 
 type Config struct {
-	Enabled              bool
-	APIURL               string
-	APIKey               string
-	ProjectKey           string
-	ServiceName          string
-	Environment          string
-	CaptureRequestBody   bool
-	CaptureResponseBody  bool
-	CaptureHeaders       bool
-	IgnoredRoutes        []string
-	SlowRequestThreshold time.Duration
-	FlushInterval        time.Duration
+	Enabled                bool
+	APIURL                 string
+	APIKey                 string
+	ProjectKey             string
+	ServiceName            string
+	Environment            string
+	CaptureRequestBody     bool
+	CaptureResponseBody    bool
+	CaptureHeaders         bool
+	IgnoredRoutes          []string
+	SlowRequestThreshold   time.Duration
+	FlushInterval          time.Duration
 	SlowRequestThresholdMS int
 	FlushIntervalMS        int
-	BatchSize            int
-	Debug                bool
-	Timeout              time.Duration
+	BatchSize              int
+	Debug                  bool
+	Timeout                time.Duration
 }
 
 func DefaultConfig() Config {
@@ -52,8 +52,15 @@ func ConfigFromEnv() Config {
 	cfg.ProjectKey = strings.TrimSpace(os.Getenv("AEGISOPS_PROJECT_KEY"))
 	cfg.ServiceName = strings.TrimSpace(os.Getenv("AEGISOPS_SERVICE_NAME"))
 	cfg.Environment = envString("AEGISOPS_ENVIRONMENT", envString("ENVIRONMENT", cfg.Environment))
-	cfg.SlowRequestThresholdMS = envInt("AEGISOPS_SLOW_REQUEST_THRESHOLD_MS", 0)
-	cfg.FlushIntervalMS = envInt("AEGISOPS_FLUSH_INTERVAL_MS", 0)
+	cfg.IgnoredRoutes = envList("AEGISOPS_IGNORED_ROUTES", cfg.IgnoredRoutes)
+	if slowMS := envInt("AEGISOPS_SLOW_REQUEST_THRESHOLD_MS", 0); slowMS > 0 {
+		cfg.SlowRequestThresholdMS = slowMS
+		cfg.SlowRequestThreshold = time.Duration(slowMS) * time.Millisecond
+	}
+	if flushMS := envInt("AEGISOPS_FLUSH_INTERVAL_MS", 0); flushMS > 0 {
+		cfg.FlushIntervalMS = flushMS
+		cfg.FlushInterval = time.Duration(flushMS) * time.Millisecond
+	}
 	cfg.BatchSize = envInt("AEGISOPS_BATCH_SIZE", cfg.BatchSize)
 	cfg.Debug = envBool("AEGISOPS_DEBUG", cfg.Debug)
 	return cfg
@@ -126,4 +133,23 @@ func envInt(key string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func envList(key string, fallback []string) []string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	if len(out) == 0 {
+		return fallback
+	}
+	return out
 }

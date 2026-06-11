@@ -25,7 +25,7 @@ export function SettingsPage() {
       {!error && organizations.length === 0 ? <EmptyState title="No organizations found" /> : null}
       <div className="grid gap-3 md:grid-cols-2">
         {organizations.map((organization) => (
-          <div key={organization.id} className="rounded-lg border border-line bg-[#0d1419] p-4">
+          <div key={organization.id} className="rounded-lg border border-line bg-panel-soft p-4">
             <p className="truncate text-sm font-medium text-white">{organization.name}</p>
             <p className="mt-1 truncate text-xs text-slate-400">{organization.slug}</p>
           </div>

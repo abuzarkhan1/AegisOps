@@ -24,10 +24,10 @@ export function ServiceHealthPanel({ targets, health }: ServiceHealthPanelProps)
           const Icon = target.icon;
           const result = health[target.name] ?? { status: "loading", detail: "checking" };
           return (
-            <div key={target.name} className="rounded-lg border border-line bg-[#0d1419] p-4">
+            <div key={target.name} className="rounded-lg border border-line bg-panel-soft p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-slate-800">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-panel-hover">
                     <Icon className="h-4 w-4 text-mint" aria-hidden="true" />
                   </div>
                   <div className="min-w-0">
@@ -37,7 +37,7 @@ export function ServiceHealthPanel({ targets, health }: ServiceHealthPanelProps)
                 </div>
                 <StatusPill status={result.status} />
               </div>
-              <div className="h-2 rounded-full bg-slate-800">
+              <div className="h-2 rounded-full bg-panel-hover">
                 <div
                   className={`h-2 rounded-full ${result.status === "ok" ? "w-full bg-mint" : "w-2/3 bg-amber"}`}
                 />

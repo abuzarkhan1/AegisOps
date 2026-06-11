@@ -119,6 +119,16 @@ The Connect Project flow supports service-scoped ingestion through local SDK pac
 
 All SDKs are fail-safe by default: telemetry failures are retried and dropped without crashing the monitored app.
 
+Example monitored apps:
+
+- `examples/monolith-node-express`
+- `examples/fastapi-service`
+- `examples/go-http-service`
+- `examples/springboot-service`
+
+Reports and retention are documented in `docs/reports-and-retention.md`.
+API key lifecycle operations are documented in `docs/api-key-management.md`.
+
 ## Validation
 
 ```bash

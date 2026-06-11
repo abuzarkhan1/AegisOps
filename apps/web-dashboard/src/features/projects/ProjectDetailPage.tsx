@@ -147,8 +147,8 @@ export function ProjectDetailPage({ project, onBack, onSelectService }: ProjectD
       setRoutePerformance(performance || []);
       setSummary({ ...emptySummary, ...detailSummary });
       setLatencyAggregates(aggregates || []);
-    } catch (error) {
-      console.error("Failed to load project details:", error);
+    } catch {
+      setSummary(emptySummary);
     } finally {
       setLoading(false);
     }
@@ -275,7 +275,7 @@ export function ProjectDetailPage({ project, onBack, onSelectService }: ProjectD
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-white">{project.name}</h1>
-              <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-mint">
+              <span className="rounded-full bg-panel-hover px-2.5 py-0.5 text-xs font-semibold text-mint">
                 {projectType}
               </span>
             </div>
@@ -325,7 +325,7 @@ export function ProjectDetailPage({ project, onBack, onSelectService }: ProjectD
           <strong>Single-service monitored application</strong> - Metrics and logs are consolidated from a single server container process.
         </div>
       ) : (
-        <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-4 text-sm text-sky-300">
+        <div className="rounded-lg border border-mint/30 bg-mint/10 p-4 text-sm text-mint">
           <strong>Microservices Architecture</strong> - Monitored across {projectServices.length} independent services and database layers.
         </div>
       )}
@@ -340,7 +340,7 @@ export function ProjectDetailPage({ project, onBack, onSelectService }: ProjectD
                 <p className="mt-1 text-sm text-slate-300">
                   Generate a service key, add the environment variables, then send a test event for {setupService?.name ?? "a service"}.
                 </p>
-                <pre className="mt-3 overflow-auto rounded-md border border-line bg-[#0d1419] p-3 text-xs leading-5 text-slate-200">
+                <pre className="mt-3 overflow-auto rounded-md border border-line bg-panel-soft p-3 text-xs leading-5 text-slate-200">
 {`AEGISOPS_ENABLED=true
 AEGISOPS_API_URL=http://localhost:8080
 AEGISOPS_API_KEY=${setupApiKey || "<generate-api-key>"}
@@ -371,7 +371,7 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
                 title="Send test event"
                 onClick={sendProjectTestEvent}
                 disabled={!setupService || setupLoading === "test-event"}
-                className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-[#0d1419] px-4 text-sm text-white disabled:opacity-60"
+                className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-panel-soft px-4 text-sm text-white disabled:opacity-60"
               >
                 <Send className="h-4 w-4" />
                 {setupLoading === "test-event" ? "Sending" : "Send Test Event"}
@@ -431,7 +431,7 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
         <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-semibold uppercase tracking-wider">Services</span>
-            <Server className="h-4 w-4 text-sky-400" />
+            <Server className="h-4 w-4 text-mint" />
           </div>
           <p className="mt-2 text-2xl font-bold text-white">{summary.servicesCount}</p>
           <p className="mt-1 text-xs text-slate-500">{projectType}</p>
@@ -461,14 +461,14 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
         {/* Throughput chart */}
         <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
           <h3 className="mb-4 text-sm font-semibold text-white">Throughput Over Time (req/s)</h3>
-          <div className="flex h-36 items-end gap-2 rounded bg-[#0d1419] p-3">
+          <div className="flex h-36 items-end gap-2 rounded bg-panel-soft p-3">
             {trendData.map((d, i) => (
               <div key={i} className="flex h-full flex-1 flex-col justify-end items-center group relative">
                 <div
                   style={{ height: `${(d.throughput / maxThroughput) * 100}%` }}
                   className="w-full rounded bg-mint/80 hover:bg-mint transition-colors"
                 />
-                <span className="absolute bottom-full mb-1 scale-0 rounded bg-slate-900 px-2 py-1 text-[10px] text-white group-hover:scale-100 transition-all z-10">
+                <span className="absolute bottom-full mb-1 scale-0 rounded bg-panel-soft px-2 py-1 text-[10px] text-white group-hover:scale-100 transition-all z-10">
                   {d.throughput} req/s
                 </span>
               </div>
@@ -479,14 +479,14 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
         {/* Latency chart */}
         <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
           <h3 className="mb-4 text-sm font-semibold text-white">p95 Latency Over Time (ms)</h3>
-          <div className="flex h-36 items-end gap-2 rounded bg-[#0d1419] p-3">
+          <div className="flex h-36 items-end gap-2 rounded bg-panel-soft p-3">
             {trendData.map((d, i) => (
               <div key={i} className="flex h-full flex-1 flex-col justify-end items-center group relative">
                 <div
                   style={{ height: `${(d.latency / maxLatency) * 100}%` }}
                   className="w-full rounded bg-amber/80 hover:bg-amber transition-colors"
                 />
-                <span className="absolute bottom-full mb-1 scale-0 rounded bg-slate-900 px-2 py-1 text-[10px] text-white group-hover:scale-100 transition-all z-10">
+                <span className="absolute bottom-full mb-1 scale-0 rounded bg-panel-soft px-2 py-1 text-[10px] text-white group-hover:scale-100 transition-all z-10">
                   {d.latency} ms
                 </span>
               </div>
@@ -497,14 +497,14 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
         {/* Error rate chart */}
         <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
           <h3 className="mb-4 text-sm font-semibold text-white">Error Rate (%)</h3>
-          <div className="flex h-36 items-end gap-2 rounded bg-[#0d1419] p-3">
+          <div className="flex h-36 items-end gap-2 rounded bg-panel-soft p-3">
             {trendData.map((d, i) => (
               <div key={i} className="flex h-full flex-1 flex-col justify-end items-center group relative">
                 <div
                   style={{ height: `${(d.errorRate / maxErrorRate) * 100}%` }}
                   className="w-full rounded bg-red-500/80 hover:bg-red-500 transition-colors"
                 />
-                <span className="absolute bottom-full mb-1 scale-0 rounded bg-slate-900 px-2 py-1 text-[10px] text-white group-hover:scale-100 transition-all z-10">
+                <span className="absolute bottom-full mb-1 scale-0 rounded bg-panel-soft px-2 py-1 text-[10px] text-white group-hover:scale-100 transition-all z-10">
                   {d.errorRate}%
                 </span>
               </div>
@@ -523,7 +523,7 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
                   <span>{item.label}</span>
                   <span>{item.value}</span>
                 </div>
-                <div className="h-2 rounded bg-slate-900">
+                <div className="h-2 rounded bg-panel-soft">
                   <div className={`h-2 rounded ${item.color}`} style={{ width: `${(item.value / maxHealth) * 100}%` }} />
                 </div>
               </div>
@@ -540,7 +540,7 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
                   <span className="truncate font-mono">{item.label}</span>
                   <span>{numberFmt(item.value, 0)}ms</span>
                 </div>
-                <div className="h-2 rounded bg-slate-900">
+                <div className="h-2 rounded bg-panel-soft">
                   <div className="h-2 rounded bg-amber/80" style={{ width: `${(item.value / maxSlowRoute) * 100}%` }} />
                 </div>
               </div>
@@ -558,7 +558,7 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
                   <span className="truncate font-mono">{item.label}</span>
                   <span>{numberFmt(item.value, 2)}%</span>
                 </div>
-                <div className="h-2 rounded bg-slate-900">
+                <div className="h-2 rounded bg-panel-soft">
                   <div className="h-2 rounded bg-red-500/80" style={{ width: `${(item.value / maxErrorRoute) * 100}%` }} />
                 </div>
               </div>
@@ -588,7 +588,7 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
                 </thead>
                 <tbody className="divide-y divide-line">
                   {projectServices.map((service) => (
-                    <tr key={service.id} className="hover:bg-slate-900/50">
+                    <tr key={service.id} className="hover:bg-panel-soft/50">
                       <td className="py-3 font-medium text-white">
                         <button
                           onClick={() => onSelectService(service.id)}
@@ -652,13 +652,13 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
                 </thead>
                 <tbody className="divide-y divide-line">
                   {routePerformance.map((route, i) => (
-                    <tr key={i} className="hover:bg-slate-900/50">
+                    <tr key={i} className="hover:bg-panel-soft/50">
                       <td className="py-3 font-mono text-xs text-slate-200">{route.route}</td>
                       <td className="py-3">
                         <span
                           className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${
                             route.method === "POST"
-                              ? "bg-sky-500/15 text-sky-400"
+                              ? "bg-mint/15 text-mint"
                               : route.method === "DELETE"
                               ? "bg-red-500/15 text-red-400"
                               : "bg-emerald-500/15 text-emerald-400"
@@ -704,7 +704,7 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
                   <span className="text-slate-500">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
                   <span
                     className={`font-semibold uppercase ${
-                      log.level === "error" ? "text-red-400" : log.level === "warn" ? "text-amber" : "text-sky-400"
+                      log.level === "error" ? "text-red-400" : log.level === "warn" ? "text-amber" : "text-mint"
                     }`}
                   >
                     {log.level}
@@ -746,7 +746,7 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
 
             {!generatingAi && aiSummary ? (
               <div className="prose prose-invert prose-xs text-xs text-slate-300 space-y-3">
-                <div className="rounded border border-line bg-[#0d1419] p-3 text-[11px] leading-relaxed whitespace-pre-line font-mono">
+                <div className="rounded border border-line bg-panel-soft p-3 text-[11px] leading-relaxed whitespace-pre-line font-mono">
                   {aiSummary}
                 </div>
               </div>
@@ -767,7 +767,7 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
             </div>
             <div className="space-y-3">
               {activeIncidents.map((incident) => (
-                <div key={incident.id} className="rounded border border-line bg-[#0d1419] p-3">
+                <div key={incident.id} className="rounded border border-line bg-panel-soft p-3">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-xs font-semibold text-white truncate">{incident.title}</p>
                     <span className="text-[10px] uppercase font-bold text-red-400">{incident.severity}</span>
@@ -810,7 +810,7 @@ AEGISOPS_ENVIRONMENT=${setupService?.environment ?? environment}`}
             <div className="space-y-3">
               {deployments.map((d) => (
                 <div key={d.id} className="flex items-start gap-2 text-xs">
-                  <GitBranch className="h-4 w-4 mt-0.5 text-sky-400" />
+                  <GitBranch className="h-4 w-4 mt-0.5 text-mint" />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-white truncate">{d.serviceName}</p>
                     <p className="text-[10px] text-slate-400">

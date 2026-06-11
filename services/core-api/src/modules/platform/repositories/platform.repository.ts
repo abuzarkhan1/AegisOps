@@ -11,6 +11,8 @@ import type {
   IncidentStatus,
   Organization,
   Project,
+  Report,
+  ReportType,
   ServiceRecord,
   ServiceType,
   User,
@@ -123,6 +125,22 @@ const auditFields = `
   created_at AS "createdAt"
 `;
 
+const reportFields = `
+  id,
+  organization_id AS "organizationId",
+  project_id AS "projectId",
+  service_id AS "serviceId",
+  report_type AS "reportType",
+  title,
+  status,
+  period_start AS "periodStart",
+  period_end AS "periodEnd",
+  generated_by AS "generatedBy",
+  payload,
+  created_at AS "createdAt",
+  updated_at AS "updatedAt"
+`;
+
 const normalizeUser = (row: any): AuthUser => ({
   ...row,
   status: row.status ?? "active",
@@ -191,7 +209,21 @@ const normalizeAuditLog = (row: any): AuditLog => ({
   organizationId: row.organizationId ?? undefined,
   actorId: row.actorId ?? undefined,
   resourceId: row.resourceId ?? undefined,
+  status: row.status ?? row.metadata?.status ?? "recorded",
+  ipAddress: row.ipAddress ?? row.metadata?.ipAddress ?? row.metadata?.ip ?? undefined,
   createdAt: toIso(row.createdAt) ?? new Date().toISOString()
+});
+
+const normalizeReport = (row: any): Report => ({
+  ...row,
+  projectId: row.projectId ?? undefined,
+  serviceId: row.serviceId ?? undefined,
+  generatedBy: row.generatedBy ?? undefined,
+  payload: row.payload ?? {},
+  periodStart: toIso(row.periodStart) ?? new Date().toISOString(),
+  periodEnd: toIso(row.periodEnd) ?? new Date().toISOString(),
+  createdAt: toIso(row.createdAt) ?? new Date().toISOString(),
+  updatedAt: toIso(row.updatedAt) ?? new Date().toISOString()
 });
 
 const publicUser = (user: AuthUser): User => {
@@ -202,6 +234,20 @@ const publicUser = (user: AuthUser): User => {
 const boundedLimit = (value: number | undefined, fallback = 100, max = 1000) => {
   if (!value || !Number.isFinite(value)) return fallback;
   return Math.max(1, Math.min(Math.trunc(value), max));
+};
+
+const reportTitle = (type: ReportType) => {
+  const labels: Record<ReportType, string> = {
+    daily_reliability: "Daily Reliability Report",
+    weekly_reliability: "Weekly Reliability Report",
+    incident_report: "Incident Report",
+    sla_report: "SLA Report",
+    service_health: "Service Health Report",
+    deployment_impact: "Deployment Impact Report",
+    ai_postmortem: "AI Postmortem Report",
+    project_monitoring: "Project Monitoring Report"
+  };
+  return labels[type];
 };
 
 export class PlatformRepository {
@@ -845,6 +891,11 @@ export class PlatformRepository {
     return normalizeApiKey(result.rows[0]);
   }
 
+  async getApiKey(apiKeyId: string) {
+    const result = await db.query(`SELECT ${apiKeyFields} FROM api_keys WHERE id = $1`, [apiKeyId]);
+    return result.rows[0] ? normalizeApiKey(result.rows[0]) : undefined;
+  }
+
   async listApiKeys(serviceId?: string, organizationId?: string) {
     const result = await db.query(
       `
@@ -857,6 +908,56 @@ export class PlatformRepository {
       [serviceId ?? null, organizationId ?? null]
     );
     return result.rows.map(normalizeApiKey).map(({ keyHash: _keyHash, ...apiKey }) => apiKey);
+  }
+
+  async rotateApiKey(input: { existing: ApiKeyRecord; prefix: string; keyHash: string }) {
+    const client = await db.connect();
+    try {
+      await client.query("BEGIN");
+      const revokedResult = await client.query(
+        `
+        UPDATE api_keys
+        SET status = 'revoked',
+            revoked_at = COALESCE(revoked_at, now())
+        WHERE id = $1
+          AND status = 'active'
+          AND revoked_at IS NULL
+        RETURNING ${apiKeyFields}
+        `,
+        [input.existing.id]
+      );
+
+      if (!revokedResult.rows[0]) {
+        await client.query("ROLLBACK");
+        return undefined;
+      }
+
+      const createdResult = await client.query(
+        `
+        INSERT INTO api_keys (id, organization_id, service_id, name, prefix, key_hash)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING ${apiKeyFields}
+        `,
+        [
+          newId(),
+          input.existing.organizationId,
+          input.existing.serviceId ?? null,
+          input.existing.name,
+          input.prefix,
+          input.keyHash
+        ]
+      );
+      await client.query("COMMIT");
+      return {
+        revokedApiKey: normalizeApiKey(revokedResult.rows[0]),
+        apiKey: normalizeApiKey(createdResult.rows[0])
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async revokeApiKey(apiKeyId: string) {
@@ -1020,7 +1121,7 @@ export class PlatformRepository {
       FROM incidents
       WHERE organization_id = $1
         AND title = $2
-        AND status <> 'resolved'
+        AND status NOT IN ('resolved', 'closed')
         AND ($3::uuid IS NULL OR service_id = $3)
       ORDER BY created_at DESC
       LIMIT 1
@@ -1044,7 +1145,11 @@ export class PlatformRepository {
           status = $4,
           assignee_id = $5,
           summary = $6,
-          resolved_at = CASE WHEN $4 = 'resolved' THEN COALESCE(resolved_at, now()) ELSE resolved_at END,
+          resolved_at = CASE
+            WHEN $4 IN ('resolved', 'closed') THEN COALESCE(resolved_at, now())
+            WHEN $4 = 'open' THEN NULL
+            ELSE resolved_at
+          END,
           updated_at = now()
       WHERE id = $1
       RETURNING ${incidentFields}
@@ -1094,6 +1199,31 @@ export class PlatformRepository {
       [incidentId]
     );
     return result.rows.map((row) => ({ ...row, createdAt: toIso(row.createdAt) }));
+  }
+
+  async listIncidentEvidence(incidentId: string) {
+    const result = await db.query(
+      `
+      SELECT id,
+             incident_id AS "incidentId",
+             evidence_type AS "evidenceType",
+             source_id AS "sourceId",
+             title,
+             payload,
+             created_at AS "createdAt"
+      FROM incident_evidence
+      WHERE incident_id = $1
+      ORDER BY created_at DESC
+      `,
+      [incidentId]
+    );
+    return result.rows.map((row) => ({
+      ...row,
+      sourceId: row.sourceId ?? undefined,
+      title: row.title ?? undefined,
+      payload: row.payload ?? {},
+      createdAt: toIso(row.createdAt) ?? new Date().toISOString()
+    }));
   }
 
   async listAiAnalysis(incidentId: string) {
@@ -1206,16 +1336,46 @@ export class PlatformRepository {
     return Boolean(result.rowCount);
   }
 
-  async listAuditLogs(organizationId?: string) {
+  async listAuditLogs(filters?: {
+    organizationId?: string;
+    actorId?: string;
+    action?: string;
+    resourceType?: string;
+    resourceId?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+    limit?: number;
+  }) {
+    const limit = boundedLimit(filters?.limit, 100, 500);
     const result = await db.query(
       `
-      SELECT ${auditFields}
+      SELECT ${auditFields},
+             COALESCE(metadata->>'status', 'recorded') AS status,
+             COALESCE(metadata->>'ipAddress', metadata->>'ip') AS "ipAddress"
       FROM audit_logs
       WHERE ($1::uuid IS NULL OR organization_id = $1)
+        AND ($2::uuid IS NULL OR actor_id = $2)
+        AND ($3::text IS NULL OR action ILIKE '%' || $3 || '%')
+        AND ($4::text IS NULL OR resource_type = $4)
+        AND ($5::uuid IS NULL OR resource_id = $5)
+        AND ($6::text IS NULL OR COALESCE(metadata->>'status', 'recorded') = $6)
+        AND ($7::timestamptz IS NULL OR created_at >= $7)
+        AND ($8::timestamptz IS NULL OR created_at <= $8)
       ORDER BY created_at DESC
-      LIMIT 200
+      LIMIT $9
       `,
-      [organizationId ?? null]
+      [
+        filters?.organizationId ?? null,
+        filters?.actorId ?? null,
+        filters?.action ?? null,
+        filters?.resourceType ?? null,
+        filters?.resourceId ?? null,
+        filters?.status ?? null,
+        filters?.from ?? null,
+        filters?.to ?? null,
+        limit
+      ]
     );
     return result.rows.map(normalizeAuditLog);
   }
@@ -1247,11 +1407,362 @@ export class PlatformRepository {
     return normalizeAuditLog(result.rows[0]);
   }
 
+  async listReports(filters?: { organizationId?: string; projectId?: string; serviceId?: string; reportType?: ReportType; limit?: number }) {
+    const limit = boundedLimit(filters?.limit, 50, 200);
+    const result = await db.query(
+      `
+      SELECT ${reportFields}
+      FROM reports
+      WHERE ($1::uuid IS NULL OR organization_id = $1)
+        AND ($2::uuid IS NULL OR project_id = $2)
+        AND ($3::uuid IS NULL OR service_id = $3)
+        AND ($4::text IS NULL OR report_type = $4)
+      ORDER BY created_at DESC
+      LIMIT $5
+      `,
+      [filters?.organizationId ?? null, filters?.projectId ?? null, filters?.serviceId ?? null, filters?.reportType ?? null, limit]
+    );
+    return result.rows.map(normalizeReport);
+  }
+
+  async getReport(reportId: string, organizationId?: string) {
+    const result = await db.query(
+      `
+      SELECT ${reportFields}
+      FROM reports
+      WHERE id = $1
+        AND ($2::uuid IS NULL OR organization_id = $2)
+      `,
+      [reportId, organizationId ?? null]
+    );
+    return result.rows[0] ? normalizeReport(result.rows[0]) : undefined;
+  }
+
+  async generateReliabilityReport(input: {
+    organizationId: string;
+    projectId?: string;
+    serviceId?: string;
+    environment?: string;
+    reportType: ReportType;
+    periodStart: string;
+    periodEnd: string;
+    generatedBy?: string;
+  }) {
+    const [organization, project, service] = await Promise.all([
+      this.getOrganization(input.organizationId),
+      input.projectId ? this.getProject(input.projectId) : Promise.resolve(undefined),
+      input.serviceId ? this.getService(input.serviceId) : Promise.resolve(undefined)
+    ]);
+    const routePerformance = await this.getRoutePerformance({
+      organizationId: input.organizationId,
+      projectId: input.projectId,
+      serviceId: input.serviceId,
+      environment: input.environment,
+      from: input.periodStart,
+      to: input.periodEnd,
+      sortBy: "p95Latency",
+      limit: 10
+    });
+
+    const result = await db.query(
+      `
+      WITH bounds AS (
+        SELECT $5::timestamptz AS from_ts, $6::timestamptz AS to_ts
+      ),
+      metric_scope AS (
+        SELECT *
+        FROM metrics m, bounds b
+        WHERE m.organization_id = $1
+          AND ($2::uuid IS NULL OR m.project_id = $2)
+          AND ($3::uuid IS NULL OR m.service_id = $3)
+          AND ($4::text IS NULL OR m.environment = $4)
+          AND m.timestamp >= b.from_ts
+          AND m.timestamp <= b.to_ts
+      ),
+      log_scope AS (
+        SELECT *
+        FROM logs l, bounds b
+        WHERE l.organization_id = $1
+          AND ($2::uuid IS NULL OR l.project_id = $2)
+          AND ($3::uuid IS NULL OR l.service_id = $3)
+          AND ($4::text IS NULL OR l.environment = $4)
+          AND l.timestamp >= b.from_ts
+          AND l.timestamp <= b.to_ts
+      ),
+      incident_scope AS (
+        SELECT *
+        FROM incidents i, bounds b
+        WHERE i.organization_id = $1
+          AND ($2::uuid IS NULL OR i.project_id = $2)
+          AND ($3::uuid IS NULL OR i.service_id = $3)
+          AND i.created_at >= b.from_ts
+          AND i.created_at <= b.to_ts
+      ),
+      deployment_scope AS (
+        SELECT d.*
+        FROM deployments d, bounds b
+        WHERE d.organization_id = $1
+          AND ($2::uuid IS NULL OR d.project_id = $2)
+          AND ($3::uuid IS NULL OR d.service_id = $3)
+          AND ($4::text IS NULL OR d.environment = $4)
+          AND d.created_at >= b.from_ts
+          AND d.created_at <= b.to_ts
+      ),
+      service_scope AS (
+        SELECT *
+        FROM services s
+        WHERE s.organization_id = $1
+          AND ($2::uuid IS NULL OR s.project_id = $2)
+          AND ($3::uuid IS NULL OR s.id = $3)
+          AND ($4::text IS NULL OR s.environment = $4)
+      )
+      SELECT
+        (
+          SELECT jsonb_build_object(
+            'metricsIngested', COUNT(*),
+            'totalThroughput', COALESCE(SUM(value) FILTER (WHERE metric_name IN ('http_requests_total', 'request_count', 'requestCount', 'worker_jobs_processed_total', 'service_events_total')), 0),
+            'errorSignals', COALESCE(SUM(value) FILTER (WHERE metric_name IN ('http_errors_total', 'http_4xx_total', 'http_5xx_total', 'exceptions_total', 'error_count', 'errorCount')), 0),
+            'latencySamples', COUNT(*) FILTER (WHERE metric_name = 'http_request_duration_ms'),
+            'avgLatencyMs', COALESCE(AVG(value) FILTER (WHERE metric_name = 'http_request_duration_ms'), 0),
+            'p50LatencyMs', COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY value) FILTER (WHERE metric_name = 'http_request_duration_ms'), 0),
+            'p95LatencyMs', COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY value) FILTER (WHERE metric_name = 'http_request_duration_ms'), 0),
+            'p99LatencyMs', COALESCE(percentile_cont(0.99) WITHIN GROUP (ORDER BY value) FILTER (WHERE metric_name = 'http_request_duration_ms'), 0)
+          )
+          FROM metric_scope
+        ) AS "telemetrySummary",
+        (
+          SELECT jsonb_build_object(
+            'logsIngested', COUNT(*),
+            'debug', COUNT(*) FILTER (WHERE level = 'debug'),
+            'info', COUNT(*) FILTER (WHERE level = 'info'),
+            'warn', COUNT(*) FILTER (WHERE level = 'warn'),
+            'error', COUNT(*) FILTER (WHERE level = 'error'),
+            'critical', COUNT(*) FILTER (WHERE level IN ('critical', 'fatal'))
+          )
+          FROM log_scope
+        ) AS "logSummary",
+        (
+          SELECT jsonb_build_object(
+            'total', COUNT(*),
+            'open', COUNT(*) FILTER (WHERE status NOT IN ('resolved', 'closed')),
+            'resolved', COUNT(*) FILTER (WHERE status IN ('resolved', 'closed')),
+            'critical', COUNT(*) FILTER (WHERE severity = 'critical'),
+            'high', COUNT(*) FILTER (WHERE severity = 'high'),
+            'medium', COUNT(*) FILTER (WHERE severity = 'medium'),
+            'low', COUNT(*) FILTER (WHERE severity = 'low'),
+            'avgResolutionMinutes', COALESCE(AVG(EXTRACT(EPOCH FROM (COALESCE(resolved_at, updated_at) - created_at))) FILTER (WHERE status IN ('resolved', 'closed')) / 60.0, 0)
+          )
+          FROM incident_scope
+        ) AS "incidentSummary",
+        (
+          SELECT jsonb_build_object(
+            'total', COUNT(*),
+            'healthy', COUNT(*) FILTER (WHERE health_status = 'healthy'),
+            'degraded', COUNT(*) FILTER (WHERE health_status = 'degraded'),
+            'down', COUNT(*) FILTER (WHERE health_status = 'down'),
+            'unknown', COUNT(*) FILTER (WHERE health_status = 'unknown')
+          )
+          FROM service_scope
+        ) AS "serviceHealth",
+        (
+          SELECT COALESCE(jsonb_agg(item ORDER BY (item->>'errorRate')::float DESC, (item->>'p95LatencyMs')::float DESC), '[]'::jsonb)
+          FROM (
+            SELECT jsonb_build_object(
+              'serviceId', s.id,
+              'serviceName', s.name,
+              'serviceType', s.service_type,
+              'language', s.language,
+              'requests', COALESCE(SUM(m.value) FILTER (WHERE m.metric_name IN ('http_requests_total', 'request_count', 'requestCount')), 0),
+              'errors', COALESCE(SUM(m.value) FILTER (WHERE m.metric_name IN ('http_errors_total', 'http_4xx_total', 'http_5xx_total', 'exceptions_total')), 0),
+              'errorRate', COALESCE((SUM(m.value) FILTER (WHERE m.metric_name IN ('http_errors_total', 'http_4xx_total', 'http_5xx_total', 'exceptions_total')) * 100.0) / NULLIF(SUM(m.value) FILTER (WHERE m.metric_name IN ('http_requests_total', 'request_count', 'requestCount')), 0), 0),
+              'p95LatencyMs', COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY m.value) FILTER (WHERE m.metric_name = 'http_request_duration_ms'), 0)
+            ) AS item
+            FROM service_scope s
+            LEFT JOIN metric_scope m ON m.service_id = s.id
+            GROUP BY s.id, s.name, s.service_type, s.language
+            ORDER BY COALESCE((SUM(m.value) FILTER (WHERE m.metric_name IN ('http_errors_total', 'http_4xx_total', 'http_5xx_total', 'exceptions_total')) * 100.0) / NULLIF(SUM(m.value) FILTER (WHERE m.metric_name IN ('http_requests_total', 'request_count', 'requestCount')), 0), 0) DESC
+            LIMIT 10
+          ) ranked
+        ) AS "topErroringServices",
+        (
+          SELECT jsonb_build_object(
+            'total', COUNT(*),
+            'completed', COUNT(*) FILTER (WHERE COALESCE(status, metadata->>'status') = 'completed'),
+            'failed', COUNT(*) FILTER (WHERE COALESCE(status, metadata->>'status') = 'failed'),
+            'regressions', COUNT(*) FILTER (WHERE di.risk IN ('high', 'critical') OR di.risk = 'regression_detected'),
+            'recent', COALESCE(jsonb_agg(jsonb_build_object(
+              'id', d.id,
+              'serviceId', d.service_id,
+              'serviceName', COALESCE(d.metadata->>'serviceName', d.metadata->>'service', d.service_id::text),
+              'environment', d.environment,
+              'version', d.version,
+              'commitSha', COALESCE(d.commit_sha, d.commit_hash),
+              'branch', d.branch,
+              'status', d.status,
+              'createdAt', d.created_at,
+              'impactRisk', di.risk
+            ) ORDER BY d.created_at DESC) FILTER (WHERE d.id IS NOT NULL), '[]'::jsonb)
+          )
+          FROM deployment_scope d
+          LEFT JOIN deployment_impacts di ON di.deployment_id = d.id
+        ) AS "deploymentSummary",
+        (
+          SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'incidentId', i.id,
+            'incidentTitle', i.title,
+            'summary', a.summary,
+            'confidenceScore', COALESCE(a.confidence_score, a.confidence),
+            'recommendedActions', a.recommended_actions,
+            'rollbackRecommendation', a.rollback_recommendation,
+            'createdAt', a.created_at
+          ) ORDER BY a.created_at DESC), '[]'::jsonb)
+          FROM ai_analysis_results a
+          JOIN incidents i ON i.id = a.incident_id
+          WHERE i.organization_id = $1
+            AND ($2::uuid IS NULL OR i.project_id = $2)
+            AND ($3::uuid IS NULL OR i.service_id = $3)
+            AND a.created_at >= $5::timestamptz
+            AND a.created_at <= $6::timestamptz
+          LIMIT 10
+        ) AS "aiRecommendations"
+      `,
+      [
+        input.organizationId,
+        input.projectId ?? null,
+        input.serviceId ?? null,
+        input.environment ?? null,
+        input.periodStart,
+        input.periodEnd
+      ]
+    );
+
+    const row = result.rows[0] ?? {};
+    const telemetrySummary = row.telemetrySummary ?? {};
+    const logSummary = row.logSummary ?? {};
+    const incidentSummary = row.incidentSummary ?? {};
+    const serviceHealth = row.serviceHealth ?? {};
+    const deploymentSummary = row.deploymentSummary ?? {};
+    const totalThroughput = Number(telemetrySummary.totalThroughput ?? 0);
+    const errorSignals = Number(telemetrySummary.errorSignals ?? 0);
+    const errorRate = totalThroughput > 0 ? Number(((errorSignals / totalThroughput) * 100).toFixed(2)) : 0;
+    const uptimePercent =
+      Number(serviceHealth.total ?? 0) > 0
+        ? Number(((Number(serviceHealth.healthy ?? 0) / Number(serviceHealth.total)) * 100).toFixed(2))
+        : 100;
+    const reliabilityScore = Math.max(
+      0,
+      Math.min(
+        100,
+        Number(
+          (
+            100 -
+            errorRate * 2 -
+            Number(incidentSummary.critical ?? 0) * 8 -
+            Number(incidentSummary.high ?? 0) * 5 -
+            Number(serviceHealth.down ?? 0) * 8 -
+            Number(serviceHealth.degraded ?? 0) * 3
+          ).toFixed(1)
+        )
+      )
+    );
+    const recommendations = [
+      errorRate >= 5 ? "Investigate the highest-error services and routes before widening deployment scope." : undefined,
+      Number(telemetrySummary.p95LatencyMs ?? 0) >= 1000 ? "Review slow routes and recent deployments for latency regressions." : undefined,
+      Number(incidentSummary.open ?? 0) > 0 ? "Resolve or assign open incidents before the next reliability report window." : undefined,
+      Number(deploymentSummary.regressions ?? 0) > 0 ? "Run deployment impact RCA for releases marked as high-risk." : undefined,
+      Number(logSummary.error ?? 0) + Number(logSummary.critical ?? 0) > 0 ? "Use Logs Explorer to inspect recurring error messages and stack traces." : undefined
+    ].filter(Boolean);
+    if (recommendations.length === 0) {
+      recommendations.push("Reliability looks stable for this period. Keep alert thresholds and SDK coverage current.");
+    }
+
+    const title = `${reportTitle(input.reportType)} - ${project?.name ?? service?.name ?? organization?.name ?? "AegisOps"}`;
+    const payload = {
+      reportType: input.reportType,
+      scope: {
+        organizationId: input.organizationId,
+        organizationName: organization?.name,
+        projectId: input.projectId,
+        projectName: project?.name,
+        serviceId: input.serviceId,
+        serviceName: service?.name,
+        environment: input.environment
+      },
+      period: {
+        from: input.periodStart,
+        to: input.periodEnd
+      },
+      summary: {
+        reliabilityScore,
+        uptimePercent,
+        totalThroughput,
+        errorRate,
+        p95LatencyMs: Number(telemetrySummary.p95LatencyMs ?? 0),
+        p99LatencyMs: Number(telemetrySummary.p99LatencyMs ?? 0),
+        incidents: Number(incidentSummary.total ?? 0),
+        openIncidents: Number(incidentSummary.open ?? 0),
+        deployments: Number(deploymentSummary.total ?? 0),
+        deploymentRegressions: Number(deploymentSummary.regressions ?? 0),
+        logsIngested: Number(logSummary.logsIngested ?? 0),
+        metricsIngested: Number(telemetrySummary.metricsIngested ?? 0)
+      },
+      telemetrySummary,
+      logSummary,
+      incidentSummary,
+      serviceHealth,
+      topSlowRoutes: routePerformance,
+      topErroringServices: row.topErroringServices ?? [],
+      deploymentSummary,
+      aiRecommendations: row.aiRecommendations ?? [],
+      recommendations,
+      exports: {
+        pdf: "placeholder",
+        csv: "placeholder",
+        email: "placeholder",
+        schedule: "placeholder"
+      }
+    };
+
+    const insert = await db.query(
+      `
+      INSERT INTO reports (
+        id,
+        organization_id,
+        project_id,
+        service_id,
+        report_type,
+        title,
+        status,
+        period_start,
+        period_end,
+        generated_by,
+        payload
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, 'generated', $7, $8, $9, $10)
+      RETURNING ${reportFields}
+      `,
+      [
+        newId(),
+        input.organizationId,
+        input.projectId ?? null,
+        input.serviceId ?? null,
+        input.reportType,
+        title,
+        input.periodStart,
+        input.periodEnd,
+        input.generatedBy ?? null,
+        JSON.stringify(payload)
+      ]
+    );
+
+    return normalizeReport(insert.rows[0]);
+  }
+
   async dashboardSummary(organizationId?: string) {
     const result = await db.query(
       `
       SELECT
-        COUNT(*) FILTER (WHERE status <> 'resolved')::int AS "openIncidents",
+        COUNT(*) FILTER (WHERE status NOT IN ('resolved', 'closed'))::int AS "openIncidents",
         COUNT(*) FILTER (WHERE severity = 'critical')::int AS "criticalIncidents",
         (SELECT COUNT(*)::int FROM projects WHERE ($1::uuid IS NULL OR organization_id = $1)) AS "projectsMonitored",
         (SELECT COUNT(*)::int FROM services WHERE ($1::uuid IS NULL OR organization_id = $1)) AS "servicesMonitored",
@@ -1305,7 +1816,7 @@ export class PlatformRepository {
       `,
       [organizationId ?? null]
     );
-    return result.rows[0];
+    return result.rows[0] ?? {};
   }
 
   async dashboardErrorTrends(hours = 24, organizationId?: string) {
@@ -1315,7 +1826,7 @@ export class PlatformRepository {
              COUNT(*)::int AS incidents,
              COUNT(*) FILTER (WHERE severity = 'critical')::int AS critical,
              COUNT(*) FILTER (WHERE severity = 'high')::int AS high,
-             COUNT(*) FILTER (WHERE status <> 'resolved')::int AS open
+             COUNT(*) FILTER (WHERE status NOT IN ('resolved', 'closed'))::int AS open
       FROM incidents
       WHERE created_at >= now() - ($1::int * interval '1 hour')
         AND ($2::uuid IS NULL OR organization_id = $2)
@@ -1384,7 +1895,7 @@ export class PlatformRepository {
           FROM incidents
           WHERE organization_id = $1
             AND project_id = $2
-            AND status <> 'resolved'
+            AND status NOT IN ('resolved', 'closed')
         ) AS "activeIncidents",
         (SELECT COUNT(*)::int FROM logs l, bounds b WHERE l.organization_id = $1 AND l.project_id = $2 AND ($3::text IS NULL OR l.environment = $3) AND l.timestamp >= b.from_ts AND l.timestamp <= b.to_ts) AS "logsIngested",
         (SELECT COUNT(*)::int FROM metric_scope) AS "metricsIngested",
@@ -1523,7 +2034,7 @@ export class PlatformRepository {
           FROM incidents
           WHERE organization_id = $1
             AND service_id = $2
-            AND status <> 'resolved'
+            AND status NOT IN ('resolved', 'closed')
         ) AS "activeIncidents",
         (
           SELECT COUNT(*)::int
@@ -1628,7 +2139,67 @@ export class PlatformRepository {
         input.postmortemDraft ?? null
       ]
     );
-    return result.rows[0];
+    return {
+      ...result.rows[0],
+      rollbackRecommendation: result.rows[0].rollbackRecommendation ?? undefined,
+      postmortemDraft: result.rows[0].postmortemDraft ?? undefined,
+      createdAt: toIso(result.rows[0].createdAt) ?? new Date().toISOString()
+    };
+  }
+
+  async saveIncidentPostmortemDraft(input: {
+    incidentId: string;
+    postmortemDraft: string;
+    summary: string;
+    likelyRootCause?: string;
+    evidence?: string[];
+    recommendedActions?: string[];
+  }) {
+    const result = await db.query(
+      `
+      WITH latest AS (
+        SELECT id
+        FROM ai_analysis_results
+        WHERE incident_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1
+      )
+      UPDATE ai_analysis_results analysis
+      SET postmortem_draft = $2
+      FROM latest
+      WHERE analysis.id = latest.id
+      RETURNING analysis.id,
+                analysis.incident_id AS "incidentId",
+                analysis.summary,
+                analysis.likely_root_cause AS "likelyRootCause",
+                analysis.confidence_score AS "confidenceScore",
+                analysis.evidence,
+                analysis.recommended_actions AS "recommendedActions",
+                analysis.rollback_recommendation AS "rollbackRecommendation",
+                analysis.postmortem_draft AS "postmortemDraft",
+                analysis.created_at AS "createdAt"
+      `,
+      [input.incidentId, input.postmortemDraft]
+    );
+
+    if (result.rows[0]) {
+      return {
+        ...result.rows[0],
+        rollbackRecommendation: result.rows[0].rollbackRecommendation ?? undefined,
+        postmortemDraft: result.rows[0].postmortemDraft ?? undefined,
+        createdAt: toIso(result.rows[0].createdAt) ?? new Date().toISOString()
+      };
+    }
+
+    return this.createAiAnalysisResult({
+      incidentId: input.incidentId,
+      summary: input.summary,
+      likelyRootCause: input.likelyRootCause ?? "Pending final engineer review.",
+      confidenceScore: 0.5,
+      evidence: input.evidence ?? [],
+      recommendedActions: input.recommendedActions ?? [],
+      postmortemDraft: input.postmortemDraft
+    });
   }
 
   async createIncidentEvidence(input: {

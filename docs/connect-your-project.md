@@ -22,6 +22,10 @@ GET /api/v1/projects/:id
 POST /api/v1/projects/:id/services
 GET /api/v1/projects/:id/services
 POST /api/v1/services/:id/api-keys
+GET /api/v1/services/:id/api-keys
+GET /api/api-keys
+POST /api/api-keys/:id/rotate
+DELETE /api/api-keys/:id
 GET /api/v1/services/:id/connection-status
 POST /api/v1/services/:id/test-event
 ```
@@ -77,6 +81,20 @@ AEGISOPS_ENVIRONMENT=production
 - Python FastAPI: `packages/aegisops-python`
 - Java Spring Boot: `packages/aegisops-java`
 - Go HTTP: `packages/aegisops-go`
+
+Example apps:
+
+- Node Express: `examples/monolith-node-express`
+- Python FastAPI: `examples/fastapi-service`
+- Java Spring Boot: `examples/springboot-service`
+- Go HTTP: `examples/go-http-service`
+
+Integration guides:
+
+- `docs/node-express-integration.md`
+- `docs/python-fastapi-integration.md`
+- `docs/java-spring-boot-integration.md`
+- `docs/go-http-integration.md`
 
 ## Manual Verification
 

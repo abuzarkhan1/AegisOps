@@ -79,7 +79,12 @@ class MiddlewareTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             await call_asgi(middleware, path="/api/error")
 
-        self.assertEqual(client.metrics[0]["metricName"], "exceptions_total")
+        metric_names = {item["metricName"] for item in client.batch_metrics}
+        self.assertIn("http_requests_total", metric_names)
+        self.assertIn("http_request_duration_ms", metric_names)
+        self.assertIn("http_errors_total", metric_names)
+        self.assertIn("http_5xx_total", metric_names)
+        self.assertIn("exceptions_total", metric_names)
         self.assertEqual(client.logs[0]["level"], "error")
 
 

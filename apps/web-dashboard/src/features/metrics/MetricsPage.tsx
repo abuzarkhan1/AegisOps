@@ -173,39 +173,39 @@ export function MetricsPage() {
             <Activity className="h-5 w-5 text-mint" />
             <h2 className="text-base font-semibold text-white">Metrics Explorer</h2>
           </div>
-          <button onClick={load} className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-300">
+          <button onClick={load} className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-300">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </button>
         </div>
 
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <select className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={filters.organizationId} onChange={(event) => setFilters((current) => ({ ...current, organizationId: event.target.value }))}>
+          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" value={filters.organizationId} onChange={(event) => setFilters((current) => ({ ...current, organizationId: event.target.value }))}>
             <option value="">All organizations</option>
             {organizations.map((org) => (
               <option key={org.id} value={org.id}>{org.name}</option>
             ))}
           </select>
-          <select className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={filters.projectId} onChange={(event) => setFilters((current) => ({ ...current, projectId: event.target.value }))}>
+          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" value={filters.projectId} onChange={(event) => setFilters((current) => ({ ...current, projectId: event.target.value }))}>
             <option value="">All projects</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>{project.name}</option>
             ))}
           </select>
-          <select className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={filters.serviceId} onChange={(event) => setFilters((current) => ({ ...current, serviceId: event.target.value }))}>
+          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" value={filters.serviceId} onChange={(event) => setFilters((current) => ({ ...current, serviceId: event.target.value }))}>
             <option value="">All services</option>
             {services.map((service) => (
               <option key={service.id} value={service.id}>{service.name}</option>
             ))}
           </select>
-          <select className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={filters.environment} onChange={(event) => setFilters((current) => ({ ...current, environment: event.target.value }))}>
+          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" value={filters.environment} onChange={(event) => setFilters((current) => ({ ...current, environment: event.target.value }))}>
             <option value="">All envs</option>
             <option value="dev">dev</option>
             <option value="staging">staging</option>
             <option value="production">production</option>
           </select>
-          <input className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={filters.metricName} onChange={(event) => setFilters((current) => ({ ...current, metricName: event.target.value }))} placeholder="metric name" />
-          <select className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" value={filters.timeRange} onChange={(event) => setFilters((current) => ({ ...current, timeRange: event.target.value }))}>
+          <input className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" value={filters.metricName} onChange={(event) => setFilters((current) => ({ ...current, metricName: event.target.value }))} placeholder="metric name" />
+          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" value={filters.timeRange} onChange={(event) => setFilters((current) => ({ ...current, timeRange: event.target.value }))}>
             {timeRanges.map((item) => (
               <option key={item.label} value={item.label}>{item.label}</option>
             ))}
@@ -217,9 +217,9 @@ export function MetricsPage() {
         <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold text-white">Aggregate Trend</h2>
-            <Layers className="h-5 w-5 text-sky-400" />
+            <Layers className="h-5 w-5 text-mint" />
           </div>
-          <div className="flex h-44 items-end gap-2 rounded-lg border border-line bg-[#0d1419] p-3">
+          <div className="flex h-44 items-end gap-2 rounded-lg border border-line bg-panel-soft p-3">
             {aggregates.length === 0 ? (
               <p className="self-center text-sm text-slate-400">No aggregate buckets yet</p>
             ) : (
@@ -238,14 +238,14 @@ export function MetricsPage() {
             <Gauge className="h-5 w-5 text-amber" />
           </div>
           <div className="grid gap-3">
-            <input className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" placeholder="API key" value={apiKey} onChange={(event) => setApiKey(event.target.value)} />
-            <input className="h-10 rounded-md border border-line bg-[#0d1419] px-3 text-sm" type="number" value={metricValue} onChange={(event) => setMetricValue(Number(event.target.value))} />
+            <input className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" placeholder="API key" value={apiKey} onChange={(event) => setApiKey(event.target.value)} />
+            <input className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" type="number" value={metricValue} onChange={(event) => setMetricValue(Number(event.target.value))} />
             <div className="grid grid-cols-2 gap-2">
               <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber px-3 text-sm font-medium text-slate-950" type="submit">
                 <Send className="h-4 w-4" />
                 Custom
               </button>
-              <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-line bg-[#0d1419] px-3 text-sm font-medium text-white" type="button" onClick={submitBatch}>
+              <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-sm font-medium text-white" type="button" onClick={submitBatch}>
                 <Layers className="h-4 w-4" />
                 Batch
               </button>

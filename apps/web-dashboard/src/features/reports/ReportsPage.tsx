@@ -1,209 +1,357 @@
-import { BarChart3, TrendingUp, Calendar, AlertTriangle, FileText, Download, CheckCircle, RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
-import { fetchIncidents } from "../../shared/api/core";
-import { EmptyState } from "../../shared/ui/EmptyState";
+import { BarChart3, Bot, Download, FileText, RefreshCw, Route, Send, ShieldCheck, TrendingUp } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  fetchOrganizations,
+  fetchProjects,
+  fetchReports,
+  fetchServices,
+  generateReport,
+  type OrganizationRecord,
+  type ProjectRecord,
+  type ReportRecord,
+  type ServiceRecord
+} from "../../shared/api/core";
+
+const reportTypes = [
+  { value: "weekly_reliability", label: "Weekly Reliability" },
+  { value: "daily_reliability", label: "Daily Reliability" },
+  { value: "incident_report", label: "Incident Report" },
+  { value: "sla_report", label: "SLA Report" },
+  { value: "service_health", label: "Service Health" },
+  { value: "deployment_impact", label: "Deployment Impact" },
+  { value: "ai_postmortem", label: "AI Postmortem" },
+  { value: "project_monitoring", label: "Project Monitoring" }
+];
+
+const numberValue = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : 0);
+const formatNumber = (value: unknown, suffix = "") => `${Math.round(numberValue(value)).toLocaleString()}${suffix}`;
+const formatPercent = (value: unknown) => `${numberValue(value).toFixed(1)}%`;
+const formatDate = (value?: string) => (value ? new Date(value).toLocaleString() : "No date");
 
 export function ReportsPage() {
-  const [incidents, setIncidents] = useState<any[]>([]);
+  const [organizations, setOrganizations] = useState<OrganizationRecord[]>([]);
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
+  const [services, setServices] = useState<ServiceRecord[]>([]);
+  const [reports, setReports] = useState<ReportRecord[]>([]);
+  const [selectedReportId, setSelectedReportId] = useState("");
+  const [filters, setFilters] = useState({
+    organizationId: "",
+    projectId: "",
+    serviceId: "",
+    environment: "",
+    reportType: "weekly_reliability",
+    periodDays: "7"
+  });
+  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const loadData = async () => {
+  const selectedReport = reports.find((report) => report.id === selectedReportId) ?? reports[0];
+  const payload = selectedReport?.payload ?? {};
+  const summary = payload.summary ?? {};
+  const incidentSummary = payload.incidentSummary ?? {};
+  const telemetrySummary = payload.telemetrySummary ?? {};
+  const logSummary = payload.logSummary ?? {};
+  const deploymentSummary = payload.deploymentSummary ?? {};
+  const topRoutes = payload.topSlowRoutes ?? [];
+  const topServices = payload.topErroringServices ?? [];
+  const aiRecommendations = payload.aiRecommendations ?? [];
+  const recommendations = payload.recommendations ?? [];
+
+  const filteredServices = useMemo(
+    () => services.filter((service) => !filters.projectId || service.projectId === filters.projectId),
+    [services, filters.projectId]
+  );
+
+  async function loadReports() {
     setLoading(true);
     try {
-      const data = await fetchIncidents();
-      setIncidents(data);
-    } catch (err) {
-      console.error(err);
+      const rows = await fetchReports({
+        organizationId: filters.organizationId,
+        projectId: filters.projectId,
+        serviceId: filters.serviceId,
+        reportType: filters.reportType,
+        limit: 25
+      });
+      setReports(rows);
+      if (!selectedReportId && rows[0]) setSelectedReportId(rows[0].id);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to load reports");
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const totalIncidents = incidents.length;
-  const criticalIncidents = incidents.filter((i) => i.severity === "critical").length;
-  const resolvedIncidents = incidents.filter((i) => i.status === "resolved");
-  const openIncidents = totalIncidents - resolvedIncidents.length;
-
-  // Calculate average resolution time
-  let avgResolutionMinutes = 0;
-  if (resolvedIncidents.length > 0) {
-    const totalDiff = resolvedIncidents.reduce((acc, curr) => {
-      const created = new Date(curr.createdAt).getTime();
-      const resolved = new Date(curr.resolvedAt || curr.updatedAt).getTime();
-      return acc + (resolved - created);
-    }, 0);
-    avgResolutionMinutes = Math.round(totalDiff / resolvedIncidents.length / 60000);
   }
 
-  // Group by service
-  const serviceCounts: Record<string, number> = {};
-  incidents.forEach((i) => {
-    const name = i.serviceName || i.serviceId || "unknown-service";
-    serviceCounts[name] = (serviceCounts[name] || 0) + 1;
-  });
-  let mostUnstableService = "None";
-  let maxCount = 0;
-  Object.entries(serviceCounts).forEach(([name, count]) => {
-    if (count > maxCount) {
-      maxCount = count;
-      mostUnstableService = name;
+  useEffect(() => {
+    Promise.all([fetchOrganizations(), fetchProjects(), fetchServices()])
+      .then(([orgRows, projectRows, serviceRows]) => {
+        setOrganizations(orgRows);
+        setProjects(projectRows);
+        setServices(serviceRows);
+        setFilters((current) => ({ ...current, organizationId: current.organizationId || orgRows[0]?.id || "" }));
+      })
+      .catch((error) => setStatus(error instanceof Error ? error.message : "Unable to load report filters"));
+  }, []);
+
+  useEffect(() => {
+    if (filters.organizationId) void loadReports();
+  }, [filters.organizationId, filters.projectId, filters.serviceId, filters.reportType]);
+
+  async function submitReport() {
+    const periodEnd = new Date();
+    const periodStart = new Date(periodEnd.getTime() - Number(filters.periodDays) * 24 * 60 * 60 * 1000);
+    setLoading(true);
+    setStatus("Generating report");
+    try {
+      const { report } = await generateReport({
+        organizationId: filters.organizationId,
+        projectId: filters.projectId,
+        serviceId: filters.serviceId,
+        environment: filters.environment,
+        reportType: filters.reportType,
+        periodStart: periodStart.toISOString(),
+        periodEnd: periodEnd.toISOString()
+      });
+      setReports((current) => [report, ...current.filter((item) => item.id !== report.id)]);
+      setSelectedReportId(report.id);
+      setStatus("Report generated");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Report generation failed");
+    } finally {
+      setLoading(false);
     }
-  });
+  }
 
   return (
-    <div className="space-y-6 text-left">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-5">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
         <div>
-          <h2 className="text-xl font-bold text-white">Reliability Reports</h2>
-          <p className="text-sm text-slate-400">Weekly and daily stability analysis across services</p>
+          <h2 className="text-xl font-semibold text-white">Reliability Reports</h2>
+          <p className="text-sm text-slate-400">Generated from incidents, telemetry, deployments, routes, and AI RCA evidence.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
-            onClick={loadData}
-            disabled={loading}
-            className="flex h-10 w-10 items-center justify-center rounded-md border border-line bg-[#0f171d] text-slate-400 hover:text-white"
+            type="button"
+            title="Refresh reports"
+            onClick={loadReports}
+            disabled={loading || !filters.organizationId}
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-300 disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
           </button>
           <button
-            onClick={() => alert("Downloading PDF Report...")}
-            className="flex h-10 items-center gap-2 rounded-md bg-mint px-4 text-xs font-bold text-slate-950 hover:bg-opacity-95 transition"
+            type="button"
+            title="Generate report"
+            onClick={submitReport}
+            disabled={loading || !filters.organizationId}
+            className="inline-flex h-10 items-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950 disabled:opacity-60"
           >
-            <Download className="h-4 w-4" />
-            Export PDF
+            <Send className="h-4 w-4" />
+            Generate
           </button>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
-          <span className="text-xs text-slate-400 block mb-1">Total Incidents</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">{totalIncidents}</span>
-            <span className="text-xs text-slate-500 font-mono">last 7 days</span>
-          </div>
+      <section className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200" value={filters.organizationId} onChange={(event) => setFilters((current) => ({ ...current, organizationId: event.target.value }))}>
+            <option value="">Organization</option>
+            {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+          </select>
+          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200" value={filters.projectId} onChange={(event) => setFilters((current) => ({ ...current, projectId: event.target.value, serviceId: "" }))}>
+            <option value="">All projects</option>
+            {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+          </select>
+          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200" value={filters.serviceId} onChange={(event) => setFilters((current) => ({ ...current, serviceId: event.target.value }))}>
+            <option value="">All services</option>
+            {filteredServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+          </select>
+          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200" value={filters.reportType} onChange={(event) => setFilters((current) => ({ ...current, reportType: event.target.value }))}>
+            {reportTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+          </select>
+          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200" value={filters.environment} onChange={(event) => setFilters((current) => ({ ...current, environment: event.target.value }))}>
+            <option value="">All envs</option>
+            <option value="dev">dev</option>
+            <option value="staging">staging</option>
+            <option value="production">production</option>
+          </select>
+          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200" value={filters.periodDays} onChange={(event) => setFilters((current) => ({ ...current, periodDays: event.target.value }))}>
+            <option value="1">1 day</option>
+            <option value="7">7 days</option>
+            <option value="30">30 days</option>
+          </select>
         </div>
+        {status ? <p className="mt-3 text-sm text-slate-300">{status}</p> : null}
+      </section>
 
-        <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
-          <span className="text-xs text-slate-400 block mb-1">Critical Incidents</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-rose-400">{criticalIncidents}</span>
-            <span className="text-xs text-slate-500 font-mono">requiring escalation</span>
+      <div className="grid gap-5 xl:grid-cols-[320px_1fr]">
+        <section className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <div className="mb-3 flex items-center gap-2">
+            <FileText className="h-5 w-5 text-mint" />
+            <h3 className="text-base font-semibold text-white">Generated Reports</h3>
           </div>
-        </div>
+          <div className="space-y-2">
+            {reports.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-line p-4 text-sm text-slate-400">No reports generated for this scope.</div>
+            ) : reports.map((report) => (
+              <button
+                key={report.id}
+                type="button"
+                onClick={() => setSelectedReportId(report.id)}
+                className={`w-full rounded-lg border p-3 text-left transition ${selectedReport?.id === report.id ? "border-mint bg-mint/10" : "border-line bg-panel-soft hover:border-slate-500"}`}
+              >
+                <p className="text-sm font-semibold text-white">{report.title}</p>
+                <p className="mt-1 text-xs text-slate-400">{formatDate(report.createdAt)}</p>
+                <p className="mt-1 text-xs text-slate-500">{report.reportType.replace(/_/g, " ")}</p>
+              </button>
+            ))}
+          </div>
+        </section>
 
-        <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
-          <span className="text-xs text-slate-400 block mb-1">Avg Resolution Time</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-amber-400">
-              {avgResolutionMinutes || 12} <span className="text-sm font-semibold">m</span>
-            </span>
-            <span className="text-xs text-slate-500 font-mono">mean time to resolve</span>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
-          <span className="text-xs text-slate-400 block mb-1">Most Unstable Service</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-base font-extrabold text-white truncate max-w-[200px]">{mostUnstableService}</span>
-            <span className="text-xs text-slate-500 font-mono shrink-0">({maxCount} alerts)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Reports Panel */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Incident severity distribution */}
-        <div className="rounded-lg border border-line bg-panel p-6 shadow-panel">
-          <div className="mb-4 flex items-center justify-between border-b border-line pb-3">
-            <h3 className="font-bold text-white text-sm">Incident Distribution By Severity</h3>
-            <BarChart3 className="h-4 w-4 text-slate-400" />
-          </div>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-xs text-slate-300 mb-1">
-                <span>Critical</span>
-                <span className="font-semibold">{criticalIncidents}</span>
+        <section className="space-y-5">
+          <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-white">{selectedReport?.title ?? "Report Preview"}</h3>
+                <p className="mt-1 text-sm text-slate-400">
+                  {selectedReport ? `${formatDate(selectedReport.periodStart)} to ${formatDate(selectedReport.periodEnd)}` : "Generate a report to populate this panel."}
+                </p>
               </div>
-              <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full bg-rose-500 transition-all"
-                  style={{ width: `${totalIncidents ? (criticalIncidents / totalIncidents) * 100 : 0}%` }}
-                />
+              <div className="flex flex-wrap gap-2">
+                {["PDF", "CSV", "Email", "Schedule"].map((item) => (
+                  <button key={item} type="button" title={`${item} placeholder`} className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs text-slate-300">
+                    <Download className="h-3.5 w-3.5" />
+                    {item}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div>
-              <div className="flex justify-between text-xs text-slate-300 mb-1">
-                <span>High</span>
-                <span className="font-semibold">{incidents.filter((i) => i.severity === "high").length}</span>
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="rounded-lg border border-line bg-panel-soft p-3">
+                <p className="text-xs text-slate-400">Reliability Score</p>
+                <p className="mt-1 text-2xl font-semibold text-white">{formatNumber(summary.reliabilityScore)}</p>
               </div>
-              <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full bg-amber-500 transition-all"
-                  style={{ width: `${totalIncidents ? (incidents.filter((i) => i.severity === "high").length / totalIncidents) * 100 : 0}%` }}
-                />
+              <div className="rounded-lg border border-line bg-panel-soft p-3">
+                <p className="text-xs text-slate-400">Uptime</p>
+                <p className="mt-1 text-2xl font-semibold text-mint">{formatPercent(summary.uptimePercent)}</p>
               </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs text-slate-300 mb-1">
-                <span>Medium</span>
-                <span className="font-semibold">{incidents.filter((i) => i.severity === "medium").length}</span>
+              <div className="rounded-lg border border-line bg-panel-soft p-3">
+                <p className="text-xs text-slate-400">Error Rate</p>
+                <p className="mt-1 text-2xl font-semibold text-amber">{formatPercent(summary.errorRate)}</p>
               </div>
-              <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full bg-sky-400 transition-all"
-                  style={{ width: `${totalIncidents ? (incidents.filter((i) => i.severity === "medium").length / totalIncidents) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-xs text-slate-300 mb-1">
-                <span>Low</span>
-                <span className="font-semibold">{incidents.filter((i) => i.severity === "low").length}</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full bg-mint transition-all"
-                  style={{ width: `${totalIncidents ? (incidents.filter((i) => i.severity === "low").length / totalIncidents) * 100 : 0}%` }}
-                />
+              <div className="rounded-lg border border-line bg-panel-soft p-3">
+                <p className="text-xs text-slate-400">P95 Latency</p>
+                <p className="mt-1 text-2xl font-semibold text-white">{formatNumber(summary.p95LatencyMs, "ms")}</p>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* SLA & Availability tracking */}
-        <div className="rounded-lg border border-line bg-panel p-6 shadow-panel">
-          <div className="mb-4 flex items-center justify-between border-b border-line pb-3">
-            <h3 className="font-bold text-white text-sm">Availability & SLA (Target: 99.9%)</h3>
-            <TrendingUp className="h-4 w-4 text-mint" />
+          <div className="grid gap-5 xl:grid-cols-2">
+            <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+              <div className="mb-3 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-mint" />
+                <h3 className="text-base font-semibold text-white">Telemetry</h3>
+              </div>
+              <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
+                <p>Throughput<br /><span className="font-semibold text-white">{formatNumber(summary.totalThroughput)}</span></p>
+                <p>Metrics<br /><span className="font-semibold text-white">{formatNumber(summary.metricsIngested)}</span></p>
+                <p>Logs<br /><span className="font-semibold text-white">{formatNumber(summary.logsIngested)}</span></p>
+                <p>Error logs<br /><span className="font-semibold text-white">{formatNumber(logSummary.error)}</span></p>
+                <p>P99 latency<br /><span className="font-semibold text-white">{formatNumber(summary.p99LatencyMs, "ms")}</span></p>
+                <p>Latency samples<br /><span className="font-semibold text-white">{formatNumber(telemetrySummary.latencySamples)}</span></p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+              <div className="mb-3 flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-mint" />
+                <h3 className="text-base font-semibold text-white">Incidents & Deployments</h3>
+              </div>
+              <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
+                <p>Total incidents<br /><span className="font-semibold text-white">{formatNumber(incidentSummary.total)}</span></p>
+                <p>Open incidents<br /><span className="font-semibold text-white">{formatNumber(incidentSummary.open)}</span></p>
+                <p>Critical/high<br /><span className="font-semibold text-white">{formatNumber(numberValue(incidentSummary.critical) + numberValue(incidentSummary.high))}</span></p>
+                <p>Avg resolution<br /><span className="font-semibold text-white">{formatNumber(incidentSummary.avgResolutionMinutes, "m")}</span></p>
+                <p>Deployments<br /><span className="font-semibold text-white">{formatNumber(deploymentSummary.total)}</span></p>
+                <p>Regressions<br /><span className="font-semibold text-white">{formatNumber(deploymentSummary.regressions)}</span></p>
+              </div>
+            </div>
           </div>
-          <div className="space-y-5 text-slate-300 text-sm">
-            <div className="flex items-center justify-between">
-              <span>Overall Platform Uptime</span>
-              <span className="font-bold text-mint">99.98%</span>
+
+          <div className="grid gap-5 xl:grid-cols-2">
+            <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+              <div className="mb-3 flex items-center gap-2">
+                <Route className="h-5 w-5 text-amber" />
+                <h3 className="text-base font-semibold text-white">Top Slow Routes</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-line text-slate-400">
+                    <tr>
+                      <th className="py-2 pr-3">Route</th>
+                      <th className="py-2 pr-3">Method</th>
+                      <th className="py-2 pr-3">P95</th>
+                      <th className="py-2">Errors</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line/40">
+                    {topRoutes.slice(0, 8).map((route) => (
+                      <tr key={`${route.method}-${route.route}`}>
+                        <td className="py-2 pr-3 font-mono text-slate-200">{route.route}</td>
+                        <td className="py-2 pr-3 text-slate-400">{route.method}</td>
+                        <td className="py-2 pr-3 text-slate-300">{Math.round(route.p95Latency)}ms</td>
+                        <td className="py-2 text-slate-300">{route.errorCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span>Checkout API SLO</span>
-              <span className="font-bold text-mint">99.94%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Payment API SLO</span>
-              <span className="font-bold text-rose-400">99.85% (Breached)</span>
-            </div>
-            <div className="flex items-center justify-between border-t border-line/40 pt-3 text-xs text-slate-400">
-              <span>Open Incidents: {openIncidents}</span>
-              <span>Resolved: {resolvedIncidents.length}</span>
+
+            <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+              <div className="mb-3 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-rose-300" />
+                <h3 className="text-base font-semibold text-white">Top Erroring Services</h3>
+              </div>
+              <div className="space-y-2">
+                {topServices.slice(0, 6).map((service) => (
+                  <div key={String(service.serviceId)} className="rounded-lg border border-line bg-panel-soft p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium text-white">{String(service.serviceName ?? "service")}</p>
+                      <span className="text-sm text-amber">{formatPercent(service.errorRate)}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">p95 {formatNumber(service.p95LatencyMs, "ms")} / {formatNumber(service.requests)} requests</p>
+                  </div>
+                ))}
+                {topServices.length === 0 ? <p className="text-sm text-slate-400">No service error data for this period.</p> : null}
+              </div>
             </div>
           </div>
-        </div>
+
+          <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+            <div className="mb-3 flex items-center gap-2">
+              <Bot className="h-5 w-5 text-mint" />
+              <h3 className="text-base font-semibold text-white">Recommendations</h3>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="space-y-2">
+                {recommendations.map((item) => (
+                  <div key={item} className="rounded-lg border border-line bg-panel-soft p-3 text-sm text-slate-200">{item}</div>
+                ))}
+              </div>
+              <div className="space-y-2">
+                {aiRecommendations.slice(0, 3).map((item) => (
+                  <div key={String(item.incidentId)} className="rounded-lg border border-line bg-panel-soft p-3">
+                    <p className="text-sm font-medium text-white">{String(item.incidentTitle ?? "AI RCA")}</p>
+                    <p className="mt-1 text-sm text-slate-400">{String(item.summary ?? "No summary")}</p>
+                  </div>
+                ))}
+                {aiRecommendations.length === 0 ? <p className="text-sm text-slate-400">No AI RCA recommendations in this report period.</p> : null}
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -129,7 +129,7 @@ export function OverviewPage({
             <h2 className="text-base font-semibold text-white">Error Trend</h2>
             <BarChart3 className="h-5 w-5 text-mint" />
           </div>
-          <div className="flex h-36 items-end gap-2 rounded-lg border border-line bg-[#0d1419] p-3">
+          <div className="flex h-36 items-end gap-2 rounded-lg border border-line bg-panel-soft p-3">
             {trends.length === 0 ? (
               <p className="self-center text-sm text-slate-400">No incidents in this window</p>
             ) : (
@@ -156,10 +156,10 @@ export function OverviewPage({
           </div>
           <div className="space-y-3">
             {incidents.map((incident) => (
-              <div key={incident.id} className="rounded-lg border border-line bg-[#0d1419] p-3">
+              <div key={incident.id} className="rounded-lg border border-line bg-panel-soft p-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="truncate text-sm font-medium text-white">{incident.title}</p>
-                  <span className="rounded-md bg-slate-800 px-2 py-1 text-xs text-slate-300">{incident.severity}</span>
+                  <span className="rounded-md bg-panel-hover px-2 py-1 text-xs text-slate-300">{incident.severity}</span>
                 </div>
                 <p className="mt-1 text-xs capitalize text-slate-400">{incident.status}</p>
               </div>
@@ -171,14 +171,14 @@ export function OverviewPage({
         <section className="rounded-lg border border-line bg-panel p-4 shadow-panel">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold text-white">Recent Deployments</h2>
-            <GitBranch className="h-5 w-5 text-sky-400" />
+            <GitBranch className="h-5 w-5 text-mint" />
           </div>
           <div className="space-y-3">
             {deployments.map((deployment) => (
-              <div key={deployment.id} className="rounded-lg border border-line bg-[#0d1419] p-3">
+              <div key={deployment.id} className="rounded-lg border border-line bg-panel-soft p-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="truncate text-sm font-medium text-white">{deployment.serviceName}</p>
-                  <span className="rounded-md bg-slate-800 px-2 py-1 text-xs text-slate-300">{deployment.status ?? deployment.provider}</span>
+                  <span className="rounded-md bg-panel-hover px-2 py-1 text-xs text-slate-300">{deployment.status ?? deployment.provider}</span>
                 </div>
                 <p className="mt-1 truncate text-xs text-slate-400">{deployment.branch ?? deployment.commitSha ?? deployment.environment}</p>
               </div>

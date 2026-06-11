@@ -56,7 +56,15 @@ class AegisOpsMiddleware:
         except Exception as exc:
             duration_ms = _duration_ms(started)
             labels = _labels(method, route, 500)
-            self.client.send_metric({"metricName": "exceptions_total", "value": 1, "labels": labels})
+            self.client.send_batch_metrics(
+                [
+                    {"metricName": "http_requests_total", "value": 1, "labels": labels},
+                    {"metricName": "http_request_duration_ms", "value": duration_ms, "labels": labels},
+                    {"metricName": "http_errors_total", "value": 1, "labels": labels},
+                    {"metricName": "http_5xx_total", "value": 1, "labels": labels},
+                    {"metricName": "exceptions_total", "value": 1, "labels": labels},
+                ]
+            )
             self.client.send_log(
                 {
                     "level": "error",

@@ -31,6 +31,12 @@ async function resourceOrganization(req: Request) {
     if (incident) return incident.organizationId;
   }
 
+  const apiKeyId = requestValue(req, "apiKeyId");
+  if (apiKeyId && uuidPattern.test(apiKeyId)) {
+    const apiKey = await platformRepository.getApiKey(apiKeyId);
+    if (apiKey) return apiKey.organizationId;
+  }
+
   return undefined;
 }
 
@@ -62,6 +68,14 @@ async function assertResourceScope(req: Request, organizationId: string) {
     const incident = await platformRepository.getIncident(incidentId);
     if (incident && incident.organizationId !== organizationId) {
       throw new HttpError(403, "Incident does not belong to this organization");
+    }
+  }
+
+  const apiKeyId = requestValue(req, "apiKeyId");
+  if (apiKeyId && uuidPattern.test(apiKeyId)) {
+    const apiKey = await platformRepository.getApiKey(apiKeyId);
+    if (apiKey && apiKey.organizationId !== organizationId) {
+      throw new HttpError(403, "API key does not belong to this organization");
     }
   }
 }

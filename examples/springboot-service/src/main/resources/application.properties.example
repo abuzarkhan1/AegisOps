@@ -1,0 +1,12 @@
+server.port=7004
+
+aegisops.enabled=true
+aegisops.api-url=http://localhost:8080
+aegisops.api-key=YOUR_API_KEY
+aegisops.project-key=loan-tracker
+aegisops.service-name=loan-tracker-springboot
+aegisops.environment=production
+aegisops.slow-request-threshold-ms=1000
+aegisops.flush-interval-ms=5000
+aegisops.batch-size=20
+aegisops.debug=false

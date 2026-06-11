@@ -8,7 +8,7 @@ pip install -e packages/aegisops-python
 
 ```python
 from fastapi import FastAPI
-from aegisops import add_aegisops_middleware
+from aegisops import AegisOpsMiddleware, add_aegisops_middleware
 
 app = FastAPI()
 add_aegisops_middleware(app)
@@ -26,3 +26,13 @@ AEGISOPS_ENVIRONMENT=production
 ```
 
 The SDK batches metrics, retries failed sends, adds request/trace IDs, and never raises telemetry failures into the monitored app.
+
+Run the example service:
+
+```bash
+cd examples/fastapi-service
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 7002
+```

@@ -45,6 +45,12 @@ The Alert Rule Engine periodically evaluates rules against aggregated metrics. I
 3. Incident evidence (e.g., matching raw metrics and logs) is captured and saved.
 4. A task is published to RabbitMQ to generate an AI RCA report.
 
+## Incident Lifecycle
+
+Incidents move through `open`, `investigating`, `identified`, `monitoring`, `resolved`, and `closed`. Each lifecycle action writes an audit event, adds a timeline entry, invalidates dashboard caches, and publishes the appropriate Kafka state-change event.
+
+Incident detail views use PostgreSQL-backed evidence from `incident_evidence`, AI analysis from `ai_analysis_results`, and timeline entries from `incident_timeline_events`. Operators can attach logs, metrics, deployment notes, route details, and related-incident evidence, then generate a persisted postmortem draft from the current incident record.
+
 ## AI RCA Engine
 
 The AI RCA service picks up the analysis request, fetches recent logs, traces, and metrics, and produces:

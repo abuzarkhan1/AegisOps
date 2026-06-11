@@ -5,18 +5,29 @@ export default {
   theme: {
     extend: {
       colors: {
-        shell: "#0b1014",
-        panel: "#11181e",
-        line: "#26323a",
-        mint: "#35d0a5",
-        amber: "#f7c948",
-        rose: "#fb7185"
+        shell: "rgb(var(--x-bg-rgb) / <alpha-value>)",
+        panel: "rgb(var(--x-surface-rgb) / <alpha-value>)",
+        "panel-soft": "rgb(var(--x-surface-2-rgb) / <alpha-value>)",
+        "panel-hover": "rgb(var(--x-surface-3-rgb) / <alpha-value>)",
+        line: "rgb(var(--x-border-rgb) / <alpha-value>)",
+        "line-soft": "rgb(var(--x-border-soft-rgb) / <alpha-value>)",
+        mint: "rgb(var(--x-blue-rgb) / <alpha-value>)",
+        amber: "rgb(var(--x-yellow-rgb) / <alpha-value>)",
+        rose: "rgb(var(--x-red-rgb) / <alpha-value>)",
+        success: "rgb(var(--x-green-rgb) / <alpha-value>)",
+        warning: "rgb(var(--x-orange-rgb) / <alpha-value>)",
+        ai: "rgb(var(--x-purple-rgb) / <alpha-value>)",
+        code: "rgb(var(--x-code-bg-rgb) / <alpha-value>)"
       },
       boxShadow: {
-        panel: "0 18px 60px rgba(0, 0, 0, 0.28)"
+        panel: "none",
+        glow: "0 0 0 1px rgba(29, 155, 240, 0.18), 0 12px 40px rgba(0, 0, 0, 0.28)"
+      },
+      fontFamily: {
+        sans: ["Inter", "Geist", "ui-sans-serif", "system-ui", "-apple-system", "BlinkMacSystemFont", "\"Segoe UI\"", "sans-serif"],
+        mono: ["\"JetBrains Mono\"", "\"Geist Mono\"", "ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"]
       }
     }
   },
   plugins: []
 } satisfies Config;
-

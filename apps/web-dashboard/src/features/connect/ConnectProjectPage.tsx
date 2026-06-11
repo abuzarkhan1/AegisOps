@@ -234,7 +234,12 @@ app.use(
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-app.use(aegisopsErrorHandler());`
+app.use(aegisopsErrorHandler());
+
+// Test:
+// curl http://localhost:7001/health
+// curl http://localhost:7001/api/orders
+// Then refresh connection status in AegisOps.`
     : "";
 
   const pythonSnippet = `pip install -e packages/aegisops-python
@@ -247,9 +252,24 @@ add_aegisops_middleware(app)
 
 @app.get("/health")
 async def health():
-    return {"ok": True}`;
+    return {"ok": True}
 
-  const javaSnippet = `<!-- Add packages/aegisops-java as a local Maven dependency/module -->
+# Run:
+# uvicorn app.main:app --host 0.0.0.0 --port 7002
+# Test:
+# curl http://localhost:7002/health
+# curl http://localhost:7002/api/orders
+# Then refresh connection status in AegisOps.`;
+
+  const javaSnippet = `# Build local SDK first:
+# cd packages/aegisops-java && mvn install
+
+<!-- Add dependency to your Spring Boot pom.xml -->
+<dependency>
+  <groupId>com.aegisops</groupId>
+  <artifactId>aegisops-java</artifactId>
+  <version>0.1.0</version>
+</dependency>
 
 import com.aegisops.sdk.AegisOpsClient;
 import com.aegisops.sdk.AegisOpsFilter;
@@ -266,9 +286,16 @@ class AegisOpsTelemetryConfig {
     bean.addUrlPatterns("/*");
     return bean;
   }
-}`;
+}
+
+# Test:
+# curl http://localhost:7004/health
+# curl http://localhost:7004/api/orders
+# Then refresh connection status in AegisOps.`;
 
   const goSnippet = `go get github.com/aegisops/aegisops-go
+# Local development before publishing:
+# go mod edit -replace github.com/aegisops/aegisops-go=../AegisOps/packages/aegisops-go
 
 package main
 
@@ -284,7 +311,12 @@ func main() {
     w.WriteHeader(http.StatusOK)
   })
   http.ListenAndServe(":7003", client.Middleware(mux))
-}`;
+}
+
+# Test:
+# curl http://localhost:7003/health
+# curl http://localhost:7003/api/orders
+# Then refresh connection status in AegisOps.`;
 
   const envSnippet = selectedRawKey
     ? `AEGISOPS_ENABLED=true
@@ -357,14 +389,14 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
               title={item}
               onClick={() => setStep(index)}
               className={`h-9 rounded-md border px-3 text-xs transition ${
-                step === index ? "border-mint bg-mint/15 text-mint" : "border-line bg-[#0d1419] text-slate-300"
+                step === index ? "border-mint bg-mint/15 text-mint" : "border-line bg-panel-soft text-slate-300"
               }`}
             >
               {index + 1}. {item}
             </button>
           ))}
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-[#0d1419] md:basis-full">
+        <div className="h-2 overflow-hidden rounded-full bg-panel-soft md:basis-full">
           <div
             className="h-full rounded-full bg-mint transition-all"
             style={{ width: `${((step + 1) / steps.length) * 100}%` }}
@@ -398,15 +430,15 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2 text-sm text-slate-300">
               <span>Project name</span>
-              <input className="w-full rounded-md border border-line bg-[#0d1419] px-3 py-2 text-white" value={projectName} onChange={(event) => setProjectName(event.target.value)} />
+              <input className="w-full rounded-md border border-line bg-panel-soft px-3 py-2 text-white" value={projectName} onChange={(event) => setProjectName(event.target.value)} />
             </label>
             <label className="space-y-2 text-sm text-slate-300">
               <span>Project key</span>
-              <input className="w-full rounded-md border border-line bg-[#0d1419] px-3 py-2 text-white" value={projectKey} onChange={(event) => setProjectKey(event.target.value)} placeholder="payments-api" />
+              <input className="w-full rounded-md border border-line bg-panel-soft px-3 py-2 text-white" value={projectKey} onChange={(event) => setProjectKey(event.target.value)} placeholder="payments-api" />
             </label>
             <label className="space-y-2 text-sm text-slate-300">
               <span>Environment</span>
-              <select className="w-full rounded-md border border-line bg-[#0d1419] px-3 py-2 text-white" value={environment} onChange={(event) => setEnvironment(event.target.value)}>
+              <select className="w-full rounded-md border border-line bg-panel-soft px-3 py-2 text-white" value={environment} onChange={(event) => setEnvironment(event.target.value)}>
                 <option value="development">development</option>
                 <option value="staging">staging</option>
                 <option value="production">production</option>
@@ -414,11 +446,11 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
             </label>
             <label className="space-y-2 text-sm text-slate-300">
               <span>Repository URL</span>
-              <input className="w-full rounded-md border border-line bg-[#0d1419] px-3 py-2 text-white" value={repositoryUrl} onChange={(event) => setRepositoryUrl(event.target.value)} />
+              <input className="w-full rounded-md border border-line bg-panel-soft px-3 py-2 text-white" value={repositoryUrl} onChange={(event) => setRepositoryUrl(event.target.value)} />
             </label>
             <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
               <span>Owner team</span>
-              <input className="w-full rounded-md border border-line bg-[#0d1419] px-3 py-2 text-white" value={ownerTeam} onChange={(event) => setOwnerTeam(event.target.value)} />
+              <input className="w-full rounded-md border border-line bg-panel-soft px-3 py-2 text-white" value={ownerTeam} onChange={(event) => setOwnerTeam(event.target.value)} />
             </label>
           </div>
         </section>
@@ -433,7 +465,7 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
                 type="button"
                 title="Add service"
                 onClick={() => setServices((current) => [...current, { name: "", serviceType: "api", language: "Generic HTTP" }])}
-                className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-white"
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-sm text-white"
               >
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 Add
@@ -442,7 +474,7 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
           </div>
           <div className="space-y-3">
             {services.map((service, index) => (
-              <div key={index} className="grid gap-3 rounded-lg border border-line bg-[#0d1419] p-3 md:grid-cols-[1fr_180px_220px_42px]">
+              <div key={index} className="grid gap-3 rounded-lg border border-line bg-panel-soft p-3 md:grid-cols-[1fr_180px_220px_42px]">
                 <input className="rounded-md border border-line bg-panel px-3 py-2 text-sm text-white" value={service.name} onChange={(event) => updateService(index, { name: event.target.value })} placeholder="service-name" />
                 <select className="rounded-md border border-line bg-panel px-3 py-2 text-sm text-white" value={service.serviceType} onChange={(event) => updateService(index, { serviceType: event.target.value })}>
                   {serviceTypes.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -485,7 +517,7 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
           </div>
           <div className="space-y-2">
             {createdServices.map((service) => (
-              <div key={service.id} className="flex flex-col gap-2 rounded-lg border border-line bg-[#0d1419] p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div key={service.id} className="flex flex-col gap-2 rounded-lg border border-line bg-panel-soft p-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-medium text-white">{service.name}</p>
                   <p className="text-xs text-slate-400">{service.serviceType} / {service.language ?? "Generic HTTP"}</p>
@@ -510,7 +542,7 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
         <section className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
           <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
             <h3 className="mb-3 text-base font-semibold text-white">Service</h3>
-            <select className="w-full rounded-md border border-line bg-[#0d1419] px-3 py-2 text-white" value={selectedServiceId} onChange={(event) => setSelectedServiceId(event.target.value)}>
+            <select className="w-full rounded-md border border-line bg-panel-soft px-3 py-2 text-white" value={selectedServiceId} onChange={(event) => setSelectedServiceId(event.target.value)}>
               {createdServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
             </select>
             <div className="mt-4 space-y-2 text-sm text-slate-300">
@@ -524,7 +556,7 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
                 title="Copy API key"
                 disabled={!selectedRawKey}
                 onClick={() => selectedRawKey ? copyText(selectedRawKey, "selected-api-key") : undefined}
-                className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-200 disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 disabled:opacity-50"
               >
                 <Copy className="h-4 w-4" aria-hidden="true" />
                 {copied === "selected-api-key" ? "Copied" : "API Key"}
@@ -534,7 +566,7 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
                 title="Copy environment config"
                 disabled={!envSnippet}
                 onClick={() => copyText(envSnippet, "env-config")}
-                className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-200 disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 disabled:opacity-50"
               >
                 <Clipboard className="h-4 w-4" aria-hidden="true" />
                 {copied === "env-config" ? "Copied" : "Env Config"}
@@ -554,7 +586,7 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
                     type="button"
                     onClick={() => setFrameworkTab(item)}
                     className={`h-9 rounded-md border px-3 text-xs transition ${
-                      frameworkTab === item ? "border-mint bg-mint/15 text-mint" : "border-line bg-[#0d1419] text-slate-300"
+                      frameworkTab === item ? "border-mint bg-mint/15 text-mint" : "border-line bg-panel-soft text-slate-300"
                     }`}
                   >
                     {item}
@@ -569,7 +601,7 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
                   title="Copy install instructions"
                   disabled={!frameworkSnippet}
                   onClick={() => copyText(frameworkSnippet, "framework-snippet")}
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-[#0d1419] px-3 text-sm text-slate-200 disabled:opacity-50"
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 disabled:opacity-50"
                 >
                   <Copy className="h-4 w-4" aria-hidden="true" />
                   {copied === "framework-snippet" ? "Copied" : "Instructions"}
@@ -577,11 +609,11 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
               </div>
               {frameworkTab === "Node.js Express" ? (
                 <>
-                  <pre className="overflow-auto rounded-lg border border-line bg-[#0d1419] p-3 text-xs leading-5 text-slate-200">{envSnippet}</pre>
-                  <pre className="overflow-auto rounded-lg border border-line bg-[#0d1419] p-3 text-xs leading-5 text-slate-200">{nodeSnippet}</pre>
+                  <pre className="overflow-auto rounded-lg border border-line bg-panel-soft p-3 text-xs leading-5 text-slate-200">{envSnippet}</pre>
+                  <pre className="overflow-auto rounded-lg border border-line bg-panel-soft p-3 text-xs leading-5 text-slate-200">{nodeSnippet}</pre>
                 </>
               ) : (
-                <pre className="overflow-auto rounded-lg border border-line bg-[#0d1419] p-3 text-xs leading-5 text-slate-200">{frameworkSnippet}</pre>
+                <pre className="overflow-auto rounded-lg border border-line bg-panel-soft p-3 text-xs leading-5 text-slate-200">{frameworkSnippet}</pre>
               )}
             </div>
           </div>
@@ -610,19 +642,19 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
             </button>
           </div>
           <div className="mb-4 grid gap-3 md:grid-cols-4">
-            <div className="rounded-lg border border-line bg-[#0d1419] p-3">
+            <div className="rounded-lg border border-line bg-panel-soft p-3">
               <p className="text-xs text-slate-400">Status</p>
               <p className="mt-1 text-sm font-semibold text-white">{connectionStatusLabel(selectedStatus?.status)}</p>
             </div>
-            <div className="rounded-lg border border-line bg-[#0d1419] p-3">
+            <div className="rounded-lg border border-line bg-panel-soft p-3">
               <p className="text-xs text-slate-400">Logs 15m</p>
               <p className="mt-1 text-sm font-semibold text-white">{selectedStatus?.logsLast15m ?? 0}</p>
             </div>
-            <div className="rounded-lg border border-line bg-[#0d1419] p-3">
+            <div className="rounded-lg border border-line bg-panel-soft p-3">
               <p className="text-xs text-slate-400">Metrics 15m</p>
               <p className="mt-1 text-sm font-semibold text-white">{selectedStatus?.metricsLast15m ?? 0}</p>
             </div>
-            <div className="rounded-lg border border-line bg-[#0d1419] p-3">
+            <div className="rounded-lg border border-line bg-panel-soft p-3">
               <p className="text-xs text-slate-400">P95 latency</p>
               <p className="mt-1 text-sm font-semibold text-white">{Math.round(selectedStatus?.p95LatencyLast15m ?? 0)} ms</p>
             </div>
@@ -642,7 +674,7 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
                 type="button"
                 title="View logs"
                 onClick={() => onNavigate?.("Logs")}
-                className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-[#0d1419] px-4 text-sm text-slate-200"
+                className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-panel-soft px-4 text-sm text-slate-200"
               >
                 <FileText className="h-4 w-4" aria-hidden="true" />
                 View Logs
@@ -651,7 +683,7 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
                 type="button"
                 title="View metrics"
                 onClick={() => onNavigate?.("Metrics")}
-                className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-[#0d1419] px-4 text-sm text-slate-200"
+                className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-panel-soft px-4 text-sm text-slate-200"
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 View Metrics
@@ -662,10 +694,10 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
             {createdServices.map((service) => {
               const status = statuses[service.id];
               return (
-                <div key={service.id} className="rounded-lg border border-line bg-[#0d1419] p-3">
+                <div key={service.id} className="rounded-lg border border-line bg-panel-soft p-3">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-medium text-white">{service.name}</p>
-                    <span className={`inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs ${status?.connected ? "bg-mint/15 text-mint" : "bg-slate-800 text-slate-300"}`}>
+                    <span className={`inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs ${status?.connected ? "bg-mint/15 text-mint" : "bg-panel-hover text-slate-300"}`}>
                       <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                       {connectionStatusLabel(status?.status)}
                     </span>
@@ -692,7 +724,7 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
           type="button"
           title="Previous step"
           onClick={() => setStep((current) => Math.max(0, current - 1))}
-          className="h-10 rounded-md border border-line bg-[#0d1419] px-4 text-sm text-slate-200"
+          className="h-10 rounded-md border border-line bg-panel-soft px-4 text-sm text-slate-200"
         >
           Back
         </button>
@@ -714,7 +746,7 @@ ${[curlLog, curlMetric, curlBatchMetric].filter(Boolean).join("\n\n")}`;
             Test <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
         ) : (
-          <button type="button" title="Refresh status" onClick={refreshStatuses} className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-[#0d1419] px-4 text-sm text-slate-200">
+          <button type="button" title="Refresh status" onClick={refreshStatuses} className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-panel-soft px-4 text-sm text-slate-200">
             Refresh Status
           </button>
         )}

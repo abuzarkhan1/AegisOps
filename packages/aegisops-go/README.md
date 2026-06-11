@@ -34,3 +34,11 @@ AEGISOPS_ENVIRONMENT=production
 ```
 
 The SDK batches metrics, retries failed sends, propagates request/trace IDs, and does not panic when AegisOps is unavailable.
+
+Run the example service:
+
+```bash
+cd examples/go-http-service
+set -a && . ./.env && set +a
+go run .
+```

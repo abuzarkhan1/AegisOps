@@ -52,6 +52,7 @@ export const openApiSpec = {
     },
     "/api-keys/validate": { post: { tags: ["API Keys"], summary: "Validate raw API key" } },
     "/api-keys/{apiKeyId}": { delete: { tags: ["API Keys"], summary: "Revoke API key" } },
+    "/api-keys/{apiKeyId}/rotate": { post: { tags: ["API Keys"], summary: "Rotate API key and return the new raw key once" } },
     "/incidents": {
       get: { tags: ["Incidents"], summary: "List incidents" },
       post: { tags: ["Incidents"], summary: "Create incident" }
@@ -61,8 +62,18 @@ export const openApiSpec = {
       patch: { tags: ["Incidents"], summary: "Update incident" }
     },
     "/incidents/{incidentId}/assign": { post: { tags: ["Incidents"], summary: "Assign incident" } },
+    "/incidents/{incidentId}/acknowledge": { post: { tags: ["Incidents"], summary: "Acknowledge incident and move it to investigating" } },
+    "/incidents/{incidentId}/identify": { post: { tags: ["Incidents"], summary: "Mark incident root cause as identified" } },
+    "/incidents/{incidentId}/monitor": { post: { tags: ["Incidents"], summary: "Mark incident as monitoring after mitigation" } },
     "/incidents/{incidentId}/resolve": { post: { tags: ["Incidents"], summary: "Resolve incident" } },
+    "/incidents/{incidentId}/reopen": { post: { tags: ["Incidents"], summary: "Reopen incident" } },
+    "/incidents/{incidentId}/close": { post: { tags: ["Incidents"], summary: "Close incident after review" } },
     "/incidents/{incidentId}/timeline": { get: { tags: ["Incidents"], summary: "List incident timeline" } },
+    "/incidents/{incidentId}/evidence": {
+      get: { tags: ["Incidents"], summary: "List structured incident evidence" },
+      post: { tags: ["Incidents"], summary: "Attach structured incident evidence" }
+    },
+    "/incidents/{incidentId}/postmortem": { post: { tags: ["Incidents"], summary: "Generate and persist a postmortem draft" } },
     "/incidents/{incidentId}/ai-analysis": {
       get: { tags: ["Incidents"], summary: "List incident AI analysis" },
       post: { tags: ["Incidents"], summary: "Persist generated incident AI analysis" }
