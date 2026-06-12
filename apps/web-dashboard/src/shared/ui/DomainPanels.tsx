@@ -3,16 +3,20 @@ import { Card } from "./Card";
 import { DataTable, type DataTableColumn } from "../table/DataTable";
 
 export function AIInsightPanel({ children }: { children: ReactNode }) {
-  return <Card title="AI Insight" className="border-ai/30 bg-ai/10">{children}</Card>;
+  return (
+    <Card title="AI Insight" className="border-ai/30 bg-ai/10">
+      {children}
+    </Card>
+  );
 }
 
 export function IncidentTimeline({ events }: { events: Array<{ id?: string; title: string; timestamp?: string }> }) {
   return (
     <div className="space-y-3">
       {events.map((event, index) => (
-        <div key={event.id ?? index} className="border-l border-line pl-3">
+        <div key={event.id ?? index} className="border-l border-white/10 pl-3">
           <p className="text-sm font-semibold text-white">{event.title}</p>
-          {event.timestamp ? <p className="text-xs text-slate-500">{event.timestamp}</p> : null}
+          {event.timestamp ? <p className="text-xs text-text-muted">{event.timestamp}</p> : null}
         </div>
       ))}
     </div>

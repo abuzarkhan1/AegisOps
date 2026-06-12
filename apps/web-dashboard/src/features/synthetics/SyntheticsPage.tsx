@@ -87,19 +87,22 @@ export function SyntheticsPage() {
     runAll();
   }, []);
 
-  const summary = useMemo(() => ({
-    ok: results.filter((result) => result.status === "ok").length,
-    degraded: results.filter((result) => result.status === "degraded").length,
-    offline: results.filter((result) => result.status === "offline").length,
-    avgLatency: results.length ? Math.round(results.reduce((sum, result) => sum + (result.latencyMs ?? 0), 0) / results.length) : 0
-  }), [results]);
+  const summary = useMemo(
+    () => ({
+      ok: results.filter((result) => result.status === "ok").length,
+      degraded: results.filter((result) => result.status === "degraded").length,
+      offline: results.filter((result) => result.status === "offline").length,
+      avgLatency: results.length ? Math.round(results.reduce((sum, result) => sum + (result.latencyMs ?? 0), 0) / results.length) : 0
+    }),
+    [results]
+  );
 
   return (
     <div className="grid gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Synthetics</h2>
-          <p className="mt-1 text-sm text-slate-400">Browser-run health probes against gateway and backend service endpoints.</p>
+          <p className="mt-1 text-sm text-text-soft">Browser-run health probes against gateway and backend service endpoints.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button icon={<RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />} disabled={loading} onClick={runAll}>
@@ -111,7 +114,7 @@ export function SyntheticsPage() {
         </div>
       </div>
 
-      {status ? <div className="rounded-lg border border-line bg-panel-soft p-3 text-sm text-slate-300">{status}</div> : null}
+      {status ? <div className="aegis-glass rounded-2xl p-3 text-sm text-text-soft">{status}</div> : null}
 
       <div className="grid gap-3 md:grid-cols-4">
         <StatCard label="Passing" value={summary.ok} detail="HTTP status matched" />
@@ -123,23 +126,35 @@ export function SyntheticsPage() {
       <Card title="Probe Results" description="Checks use the same browser network path as the dashboard.">
         <div className="grid gap-3 xl:grid-cols-2">
           {results.map((result) => (
-            <div key={result.name} className="rounded-lg border border-line bg-panel-soft p-4">
+            <div key={result.name} className="aegis-glass rounded-2xl p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <Wifi className="h-4 w-4 text-mint" />
+                    <Wifi className="h-4 w-4 text-white" />
                     <h3 className="text-sm font-semibold text-white">{result.name}</h3>
                   </div>
-                  <p className="mt-2 break-all text-xs text-slate-500">{result.url}</p>
+                  <p className="mt-2 break-all text-xs text-text-muted">{result.url}</p>
                 </div>
                 <StatusBadge status={result.status} />
               </div>
-              <div className="mt-4 grid gap-2 text-sm text-slate-400 sm:grid-cols-3">
-                <p>HTTP<br /><span className="font-mono text-slate-200">{result.httpStatus ?? "-"}</span></p>
-                <p>Latency<br /><span className="font-mono text-slate-200">{result.latencyMs ?? "-"}ms</span></p>
-                <p>Checked<br /><span className="font-mono text-slate-200">{new Date(result.checkedAt).toLocaleTimeString()}</span></p>
+              <div className="mt-4 grid gap-2 text-sm text-text-soft sm:grid-cols-3">
+                <p>
+                  HTTP
+                  <br />
+                  <span className="font-mono text-text-primary">{result.httpStatus ?? "-"}</span>
+                </p>
+                <p>
+                  Latency
+                  <br />
+                  <span className="font-mono text-text-primary">{result.latencyMs ?? "-"}ms</span>
+                </p>
+                <p>
+                  Checked
+                  <br />
+                  <span className="font-mono text-text-primary">{new Date(result.checkedAt).toLocaleTimeString()}</span>
+                </p>
               </div>
-              <p className="mt-3 text-sm text-slate-300">{result.detail}</p>
+              <p className="mt-3 text-sm text-text-soft">{result.detail}</p>
             </div>
           ))}
         </div>

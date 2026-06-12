@@ -12,21 +12,28 @@ export function Tabs({
 }) {
   return (
     <div>
-      <div role="tablist" className="inline-flex rounded-full border border-line bg-panel-soft p-1">
+      <div role="tablist" className="inline-flex rounded-full border border-white/10 bg-white/5 p-1">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             role="tab"
+            id={`tab-${tab.id}`}
+            aria-controls={`tabpanel-${tab.id}`}
             aria-selected={active === tab.id}
             type="button"
             onClick={() => onChange(tab.id)}
-            className={cn("h-8 rounded-full px-3 text-xs font-semibold transition", active === tab.id ? "bg-mint text-black" : "text-slate-400 hover:text-white")}
+            className={cn(
+              "h-8 rounded-full px-3 text-xs font-semibold transition",
+              active === tab.id ? "bg-white text-black" : "text-text-soft hover:text-white"
+            )}
           >
             {tab.label}
           </button>
         ))}
       </div>
-      {tabs.find((tab) => tab.id === active)?.content}
+      <div role="tabpanel" id={`tabpanel-${active}`} aria-labelledby={`tab-${active}`} className="mt-4">
+        {tabs.find((tab) => tab.id === active)?.content}
+      </div>
     </div>
   );
 }

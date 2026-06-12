@@ -27,7 +27,11 @@ const numberValue = (value: unknown) => (typeof value === "number" && Number.isF
 const formatNumber = (value: unknown, suffix = "") => `${Math.round(numberValue(value)).toLocaleString()}${suffix}`;
 const formatPercent = (value: unknown) => `${numberValue(value).toFixed(1)}%`;
 const formatDate = (value?: string) => (value ? new Date(value).toLocaleString() : "No date");
-const safeFilename = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "report";
+const safeFilename = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "") || "report";
 
 export function ReportsPage() {
   const [organizations, setOrganizations] = useState<OrganizationRecord[]>([]);
@@ -137,10 +141,10 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
           <h2 className="text-xl font-semibold text-white">Reliability Reports</h2>
-          <p className="text-sm text-slate-400">Generated from incidents, telemetry, deployments, routes, and AI RCA evidence.</p>
+          <p className="text-sm text-text-soft">Generated from incidents, telemetry, deployments, routes, and AI RCA evidence.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -148,7 +152,7 @@ export function ReportsPage() {
             title="Refresh reports"
             onClick={loadReports}
             disabled={loading || !filters.organizationId}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-300 disabled:opacity-50"
+            className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-soft disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -158,7 +162,7 @@ export function ReportsPage() {
             title="Generate report"
             onClick={submitReport}
             disabled={loading || !filters.organizationId}
-            className="inline-flex h-10 items-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950 disabled:opacity-60"
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-60"
           >
             <Send className="h-4 w-4" />
             Generate
@@ -166,69 +170,115 @@ export function ReportsPage() {
         </div>
       </div>
 
-      <section className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+      <section className="aegis-glass rounded-2xl p-4 shadow-panel">
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200" value={filters.organizationId} onChange={(event) => setFilters((current) => ({ ...current, organizationId: event.target.value }))}>
+          <select
+            className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary"
+            value={filters.organizationId}
+            onChange={(event) => setFilters((current) => ({ ...current, organizationId: event.target.value }))}
+          >
             <option value="">Organization</option>
-            {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+            {organizations.map((org) => (
+              <option key={org.id} value={org.id}>
+                {org.name}
+              </option>
+            ))}
           </select>
-          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200" value={filters.projectId} onChange={(event) => setFilters((current) => ({ ...current, projectId: event.target.value, serviceId: "" }))}>
+          <select
+            className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary"
+            value={filters.projectId}
+            onChange={(event) => setFilters((current) => ({ ...current, projectId: event.target.value, serviceId: "" }))}
+          >
             <option value="">All projects</option>
-            {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
           </select>
-          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200" value={filters.serviceId} onChange={(event) => setFilters((current) => ({ ...current, serviceId: event.target.value }))}>
+          <select
+            className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary"
+            value={filters.serviceId}
+            onChange={(event) => setFilters((current) => ({ ...current, serviceId: event.target.value }))}
+          >
             <option value="">All services</option>
-            {filteredServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+            {filteredServices.map((service) => (
+              <option key={service.id} value={service.id}>
+                {service.name}
+              </option>
+            ))}
           </select>
-          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200" value={filters.reportType} onChange={(event) => setFilters((current) => ({ ...current, reportType: event.target.value }))}>
-            {reportTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+          <select
+            className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary"
+            value={filters.reportType}
+            onChange={(event) => setFilters((current) => ({ ...current, reportType: event.target.value }))}
+          >
+            {reportTypes.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
+              </option>
+            ))}
           </select>
-          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200" value={filters.environment} onChange={(event) => setFilters((current) => ({ ...current, environment: event.target.value }))}>
+          <select
+            className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary"
+            value={filters.environment}
+            onChange={(event) => setFilters((current) => ({ ...current, environment: event.target.value }))}
+          >
             <option value="">All envs</option>
             <option value="dev">dev</option>
             <option value="staging">staging</option>
             <option value="production">production</option>
           </select>
-          <select className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200" value={filters.periodDays} onChange={(event) => setFilters((current) => ({ ...current, periodDays: event.target.value }))}>
+          <select
+            className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary"
+            value={filters.periodDays}
+            onChange={(event) => setFilters((current) => ({ ...current, periodDays: event.target.value }))}
+          >
             <option value="1">1 day</option>
             <option value="7">7 days</option>
             <option value="30">30 days</option>
           </select>
         </div>
-        {status ? <p className="mt-3 text-sm text-slate-300">{status}</p> : null}
+        {status ? <p className="mt-3 text-sm text-text-soft">{status}</p> : null}
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[320px_1fr]">
-        <section className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+        <section className="aegis-glass rounded-2xl p-4 shadow-panel">
           <div className="mb-3 flex items-center gap-2">
-            <FileText className="h-5 w-5 text-mint" />
+            <FileText className="h-5 w-5 text-white" />
             <h3 className="text-base font-semibold text-white">Generated Reports</h3>
           </div>
           <div className="space-y-2">
             {reports.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-line p-4 text-sm text-slate-400">No reports generated for this scope.</div>
-            ) : reports.map((report) => (
-              <button
-                key={report.id}
-                type="button"
-                onClick={() => setSelectedReportId(report.id)}
-                className={`w-full rounded-lg border p-3 text-left transition ${selectedReport?.id === report.id ? "border-mint bg-mint/10" : "border-line bg-panel-soft hover:border-slate-500"}`}
-              >
-                <p className="text-sm font-semibold text-white">{report.title}</p>
-                <p className="mt-1 text-xs text-slate-400">{formatDate(report.createdAt)}</p>
-                <p className="mt-1 text-xs text-slate-500">{report.reportType.replace(/_/g, " ")}</p>
-              </button>
-            ))}
+              <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-text-soft">
+                No reports generated for this scope.
+              </div>
+            ) : (
+              reports.map((report) => (
+                <button
+                  key={report.id}
+                  type="button"
+                  onClick={() => setSelectedReportId(report.id)}
+                  className={`w-full rounded-2xl border p-3 text-left transition ${selectedReport?.id === report.id ? "border-white/40 bg-white/10" : "border-white/10 bg-white/5 hover:border-slate-500"}`}
+                >
+                  <p className="text-sm font-semibold text-white">{report.title}</p>
+                  <p className="mt-1 text-xs text-text-soft">{formatDate(report.createdAt)}</p>
+                  <p className="mt-1 text-xs text-text-muted">{report.reportType.replace(/_/g, " ")}</p>
+                </button>
+              ))
+            )}
           </div>
         </section>
 
         <section className="space-y-5">
-          <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <div className="aegis-glass rounded-2xl p-4 shadow-panel">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-white">{selectedReport?.title ?? "Report Preview"}</h3>
-                <p className="mt-1 text-sm text-slate-400">
-                  {selectedReport ? `${formatDate(selectedReport.periodStart)} to ${formatDate(selectedReport.periodEnd)}` : "Generate a report to populate this panel."}
+                <p className="mt-1 text-sm text-text-soft">
+                  {selectedReport
+                    ? `${formatDate(selectedReport.periodStart)} to ${formatDate(selectedReport.periodEnd)}`
+                    : "Generate a report to populate this panel."}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -237,7 +287,7 @@ export function ReportsPage() {
                   title="Download JSON"
                   disabled={!selectedReport}
                   onClick={() => downloadReport("json")}
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs text-slate-300 disabled:opacity-50"
+                  className="inline-flex h-9 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs text-text-soft disabled:opacity-50"
                 >
                   <Download className="h-3.5 w-3.5" />
                   JSON
@@ -247,7 +297,7 @@ export function ReportsPage() {
                   title="Download CSV"
                   disabled={!selectedReport}
                   onClick={() => downloadReport("csv")}
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs text-slate-300 disabled:opacity-50"
+                  className="inline-flex h-9 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs text-text-soft disabled:opacity-50"
                 >
                   <Download className="h-3.5 w-3.5" />
                   CSV
@@ -257,7 +307,7 @@ export function ReportsPage() {
                   title="Print report"
                   disabled={!selectedReport}
                   onClick={() => window.print()}
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs text-slate-300 disabled:opacity-50"
+                  className="inline-flex h-9 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs text-text-soft disabled:opacity-50"
                 >
                   <Download className="h-3.5 w-3.5" />
                   Print
@@ -266,66 +316,116 @@ export function ReportsPage() {
             </div>
 
             <div className="grid gap-3 md:grid-cols-4">
-              <div className="rounded-lg border border-line bg-panel-soft p-3">
-                <p className="text-xs text-slate-400">Reliability Score</p>
+              <div className="aegis-glass rounded-2xl p-3">
+                <p className="text-xs text-text-soft">Reliability Score</p>
                 <p className="mt-1 text-2xl font-semibold text-white">{formatNumber(summary.reliabilityScore)}</p>
               </div>
-              <div className="rounded-lg border border-line bg-panel-soft p-3">
-                <p className="text-xs text-slate-400">Uptime</p>
-                <p className="mt-1 text-2xl font-semibold text-mint">{formatPercent(summary.uptimePercent)}</p>
+              <div className="aegis-glass rounded-2xl p-3">
+                <p className="text-xs text-text-soft">Uptime</p>
+                <p className="mt-1 text-2xl font-semibold text-white">{formatPercent(summary.uptimePercent)}</p>
               </div>
-              <div className="rounded-lg border border-line bg-panel-soft p-3">
-                <p className="text-xs text-slate-400">Error Rate</p>
+              <div className="aegis-glass rounded-2xl p-3">
+                <p className="text-xs text-text-soft">Error Rate</p>
                 <p className="mt-1 text-2xl font-semibold text-amber">{formatPercent(summary.errorRate)}</p>
               </div>
-              <div className="rounded-lg border border-line bg-panel-soft p-3">
-                <p className="text-xs text-slate-400">P95 Latency</p>
+              <div className="aegis-glass rounded-2xl p-3">
+                <p className="text-xs text-text-soft">P95 Latency</p>
                 <p className="mt-1 text-2xl font-semibold text-white">{formatNumber(summary.p95LatencyMs, "ms")}</p>
               </div>
             </div>
           </div>
 
           <div className="grid gap-5 xl:grid-cols-2">
-            <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+            <div className="aegis-glass rounded-2xl p-4 shadow-panel">
               <div className="mb-3 flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-mint" />
+                <BarChart3 className="h-5 w-5 text-white" />
                 <h3 className="text-base font-semibold text-white">Telemetry</h3>
               </div>
-              <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
-                <p>Throughput<br /><span className="font-semibold text-white">{formatNumber(summary.totalThroughput)}</span></p>
-                <p>Metrics<br /><span className="font-semibold text-white">{formatNumber(summary.metricsIngested)}</span></p>
-                <p>Logs<br /><span className="font-semibold text-white">{formatNumber(summary.logsIngested)}</span></p>
-                <p>Error logs<br /><span className="font-semibold text-white">{formatNumber(logSummary.error)}</span></p>
-                <p>P99 latency<br /><span className="font-semibold text-white">{formatNumber(summary.p99LatencyMs, "ms")}</span></p>
-                <p>Latency samples<br /><span className="font-semibold text-white">{formatNumber(telemetrySummary.latencySamples)}</span></p>
+              <div className="grid gap-2 text-sm text-text-soft sm:grid-cols-2">
+                <p>
+                  Throughput
+                  <br />
+                  <span className="font-semibold text-white">{formatNumber(summary.totalThroughput)}</span>
+                </p>
+                <p>
+                  Metrics
+                  <br />
+                  <span className="font-semibold text-white">{formatNumber(summary.metricsIngested)}</span>
+                </p>
+                <p>
+                  Logs
+                  <br />
+                  <span className="font-semibold text-white">{formatNumber(summary.logsIngested)}</span>
+                </p>
+                <p>
+                  Error logs
+                  <br />
+                  <span className="font-semibold text-white">{formatNumber(logSummary.error)}</span>
+                </p>
+                <p>
+                  P99 latency
+                  <br />
+                  <span className="font-semibold text-white">{formatNumber(summary.p99LatencyMs, "ms")}</span>
+                </p>
+                <p>
+                  Latency samples
+                  <br />
+                  <span className="font-semibold text-white">{formatNumber(telemetrySummary.latencySamples)}</span>
+                </p>
               </div>
             </div>
 
-            <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+            <div className="aegis-glass rounded-2xl p-4 shadow-panel">
               <div className="mb-3 flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-mint" />
+                <ShieldCheck className="h-5 w-5 text-white" />
                 <h3 className="text-base font-semibold text-white">Incidents & Deployments</h3>
               </div>
-              <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
-                <p>Total incidents<br /><span className="font-semibold text-white">{formatNumber(incidentSummary.total)}</span></p>
-                <p>Open incidents<br /><span className="font-semibold text-white">{formatNumber(incidentSummary.open)}</span></p>
-                <p>Critical/high<br /><span className="font-semibold text-white">{formatNumber(numberValue(incidentSummary.critical) + numberValue(incidentSummary.high))}</span></p>
-                <p>Avg resolution<br /><span className="font-semibold text-white">{formatNumber(incidentSummary.avgResolutionMinutes, "m")}</span></p>
-                <p>Deployments<br /><span className="font-semibold text-white">{formatNumber(deploymentSummary.total)}</span></p>
-                <p>Regressions<br /><span className="font-semibold text-white">{formatNumber(deploymentSummary.regressions)}</span></p>
+              <div className="grid gap-2 text-sm text-text-soft sm:grid-cols-2">
+                <p>
+                  Total incidents
+                  <br />
+                  <span className="font-semibold text-white">{formatNumber(incidentSummary.total)}</span>
+                </p>
+                <p>
+                  Open incidents
+                  <br />
+                  <span className="font-semibold text-white">{formatNumber(incidentSummary.open)}</span>
+                </p>
+                <p>
+                  Critical/high
+                  <br />
+                  <span className="font-semibold text-white">
+                    {formatNumber(numberValue(incidentSummary.critical) + numberValue(incidentSummary.high))}
+                  </span>
+                </p>
+                <p>
+                  Avg resolution
+                  <br />
+                  <span className="font-semibold text-white">{formatNumber(incidentSummary.avgResolutionMinutes, "m")}</span>
+                </p>
+                <p>
+                  Deployments
+                  <br />
+                  <span className="font-semibold text-white">{formatNumber(deploymentSummary.total)}</span>
+                </p>
+                <p>
+                  Regressions
+                  <br />
+                  <span className="font-semibold text-white">{formatNumber(deploymentSummary.regressions)}</span>
+                </p>
               </div>
             </div>
           </div>
 
           <div className="grid gap-5 xl:grid-cols-2">
-            <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+            <div className="aegis-glass rounded-2xl p-4 shadow-panel">
               <div className="mb-3 flex items-center gap-2">
                 <Route className="h-5 w-5 text-amber" />
                 <h3 className="text-base font-semibold text-white">Top Slow Routes</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="border-b border-line text-slate-400">
+                  <thead className="border-b border-white/10 text-text-soft">
                     <tr>
                       <th className="py-2 pr-3">Route</th>
                       <th className="py-2 pr-3">Method</th>
@@ -336,10 +436,10 @@ export function ReportsPage() {
                   <tbody className="divide-y divide-line/40">
                     {topRoutes.slice(0, 8).map((route) => (
                       <tr key={`${route.method}-${route.route}`}>
-                        <td className="py-2 pr-3 font-mono text-slate-200">{route.route}</td>
-                        <td className="py-2 pr-3 text-slate-400">{route.method}</td>
-                        <td className="py-2 pr-3 text-slate-300">{Math.round(route.p95Latency)}ms</td>
-                        <td className="py-2 text-slate-300">{route.errorCount}</td>
+                        <td className="py-2 pr-3 font-mono text-text-primary">{route.route}</td>
+                        <td className="py-2 pr-3 text-text-soft">{route.method}</td>
+                        <td className="py-2 pr-3 text-text-soft">{Math.round(route.p95Latency)}ms</td>
+                        <td className="py-2 text-text-soft">{route.errorCount}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -347,45 +447,51 @@ export function ReportsPage() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+            <div className="aegis-glass rounded-2xl p-4 shadow-panel">
               <div className="mb-3 flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-rose-300" />
                 <h3 className="text-base font-semibold text-white">Top Erroring Services</h3>
               </div>
               <div className="space-y-2">
                 {topServices.slice(0, 6).map((service) => (
-                  <div key={String(service.serviceId)} className="rounded-lg border border-line bg-panel-soft p-3">
+                  <div key={String(service.serviceId)} className="aegis-glass rounded-2xl p-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-medium text-white">{String(service.serviceName ?? "service")}</p>
                       <span className="text-sm text-amber">{formatPercent(service.errorRate)}</span>
                     </div>
-                    <p className="mt-1 text-xs text-slate-400">p95 {formatNumber(service.p95LatencyMs, "ms")} / {formatNumber(service.requests)} requests</p>
+                    <p className="mt-1 text-xs text-text-soft">
+                      p95 {formatNumber(service.p95LatencyMs, "ms")} / {formatNumber(service.requests)} requests
+                    </p>
                   </div>
                 ))}
-                {topServices.length === 0 ? <p className="text-sm text-slate-400">No service error data for this period.</p> : null}
+                {topServices.length === 0 ? <p className="text-sm text-text-soft">No service error data for this period.</p> : null}
               </div>
             </div>
           </div>
 
-          <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <div className="aegis-glass rounded-2xl p-4 shadow-panel">
             <div className="mb-3 flex items-center gap-2">
-              <Bot className="h-5 w-5 text-mint" />
+              <Bot className="h-5 w-5 text-white" />
               <h3 className="text-base font-semibold text-white">Recommendations</h3>
             </div>
             <div className="grid gap-3 lg:grid-cols-2">
               <div className="space-y-2">
                 {recommendations.map((item) => (
-                  <div key={item} className="rounded-lg border border-line bg-panel-soft p-3 text-sm text-slate-200">{item}</div>
+                  <div key={item} className="aegis-glass rounded-2xl p-3 text-sm text-text-primary">
+                    {item}
+                  </div>
                 ))}
               </div>
               <div className="space-y-2">
                 {aiRecommendations.slice(0, 3).map((item) => (
-                  <div key={String(item.incidentId)} className="rounded-lg border border-line bg-panel-soft p-3">
+                  <div key={String(item.incidentId)} className="aegis-glass rounded-2xl p-3">
                     <p className="text-sm font-medium text-white">{String(item.incidentTitle ?? "AI RCA")}</p>
-                    <p className="mt-1 text-sm text-slate-400">{String(item.summary ?? "No summary")}</p>
+                    <p className="mt-1 text-sm text-text-soft">{String(item.summary ?? "No summary")}</p>
                   </div>
                 ))}
-                {aiRecommendations.length === 0 ? <p className="text-sm text-slate-400">No AI RCA recommendations in this report period.</p> : null}
+                {aiRecommendations.length === 0 ? (
+                  <p className="text-sm text-text-soft">No AI RCA recommendations in this report period.</p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -411,5 +517,5 @@ function reportToCsv(report: ReportRecord) {
   for (const [key, value] of Object.entries(telemetrySummary)) rows.push([`telemetry.${key}`, String(value)]);
   const incidentSummary = report.payload.incidentSummary ?? {};
   for (const [key, value] of Object.entries(incidentSummary)) rows.push([`incidents.${key}`, String(value)]);
-  return rows.map((row) => row.map((cell) => `"${cell.replace(/"/g, "\"\"")}"`).join(",")).join("\n");
+  return rows.map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\n");
 }

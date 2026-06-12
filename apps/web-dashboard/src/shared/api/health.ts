@@ -26,4 +26,3 @@ export async function fetchHealthTarget(target: HealthTarget, signal?: AbortSign
     ] as const;
   }
 }
-

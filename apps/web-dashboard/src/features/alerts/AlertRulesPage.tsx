@@ -21,18 +21,21 @@ import { StatusBadge } from "../../shared/ui/Badge";
 import { Button } from "../../shared/ui/Button";
 import { Card, StatCard } from "../../shared/ui/Card";
 import { Input, Select } from "../../shared/ui/FormControls";
+import { EmptyState } from "../../shared/ui/EmptyState";
 
 const severityClasses: Record<string, string> = {
   critical: "border-rose-500/40 bg-rose-500/10 text-rose-400",
   high: "border-amber-500/40 bg-amber-500/10 text-amber-400",
-  medium: "border-mint/40 bg-mint/10 text-mint",
-  low: "border-mint/40 bg-mint/10 text-mint"
+  medium: "border-white/25 bg-white/10 text-white",
+  low: "border-white/25 bg-white/10 text-white"
 };
 
 const numberValue = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : Number(value) || 0);
 
 function metricsFromAggregates(aggregates: MetricAggregateRecord[], logs: any[]) {
-  const errorLogs = logs.filter((log) => numberValue(log.statusCode) >= 500 || ["error", "fatal"].includes(String(log.level).toLowerCase())).length;
+  const errorLogs = logs.filter(
+    (log) => numberValue(log.statusCode) >= 500 || ["error", "fatal"].includes(String(log.level).toLowerCase())
+  ).length;
   const requestCount = logs.length || aggregates.reduce((sum, item) => sum + numberValue(item.count), 0);
   const latencyAggregates = aggregates.filter((item) => item.metricName.includes("latency") || item.metricName.includes("duration"));
   return {
@@ -43,6 +46,70 @@ function metricsFromAggregates(aggregates: MetricAggregateRecord[], logs: any[])
     p95LatencyMs: Math.max(0, ...latencyAggregates.map((item) => numberValue(item.p95))),
     p99LatencyMs: Math.max(0, ...latencyAggregates.map((item) => numberValue(item.p99)))
   };
+}
+
+function recommendedRulesFor(service?: ServiceRecord) {
+  const type = service?.serviceType ?? "api";
+  if (type === "worker") {
+    return [
+      { name: "Failed jobs > 10 in 5 minutes", metric: "log_error", operator: "gt", threshold: 10, durationSeconds: 300, severity: "high" },
+      {
+        name: "Queue duration > 30000ms",
+        metric: "p95LatencyMs",
+        operator: "gt",
+        threshold: 30000,
+        durationSeconds: 300,
+        severity: "medium"
+      },
+      {
+        name: "No job processed for 15 minutes",
+        metric: "service_health",
+        operator: "eq",
+        threshold: 0,
+        durationSeconds: 900,
+        severity: "medium"
+      }
+    ];
+  }
+  if (type === "cache") {
+    return [
+      { name: "Cache hit ratio < 70%", metric: "cache_hit_ratio", operator: "lt", threshold: 70, durationSeconds: 300, severity: "medium" },
+      { name: "Memory usage > 80%", metric: "memory_usage_percent", operator: "gt", threshold: 80, durationSeconds: 300, severity: "high" }
+    ];
+  }
+  if (type === "database") {
+    return [
+      { name: "Query latency > 1000ms", metric: "p95LatencyMs", operator: "gt", threshold: 1000, durationSeconds: 300, severity: "high" },
+      {
+        name: "Connection usage > 80%",
+        metric: "connection_usage_percent",
+        operator: "gt",
+        threshold: 80,
+        durationSeconds: 300,
+        severity: "medium"
+      }
+    ];
+  }
+  return [
+    { name: "Error rate > 5% for 5 minutes", metric: "error_rate", operator: "gt", threshold: 5, durationSeconds: 300, severity: "high" },
+    {
+      name: "P95 latency > 2000ms for 10 minutes",
+      metric: "p95LatencyMs",
+      operator: "gt",
+      threshold: 2000,
+      durationSeconds: 600,
+      severity: "high"
+    },
+    { name: "5xx errors > 20 in 5 minutes", metric: "log_error", operator: "gt", threshold: 20, durationSeconds: 300, severity: "medium" },
+    {
+      name: "No telemetry received for 15 minutes",
+      metric: "service_health",
+      operator: "eq",
+      threshold: 0,
+      durationSeconds: 900,
+      severity: "medium"
+    }
+  ];
 }
 
 export function AlertRulesPage() {
@@ -153,7 +220,9 @@ export function AlertRulesPage() {
     setStatus("Evaluating log rules");
     try {
       const logs = await fetchLogs({ serviceId: selectedService.id, environment, from: fromIso, limit: 50 });
-      const log = logs.find((item) => ["error", "fatal"].includes(String(item.level).toLowerCase()) || numberValue(item.statusCode) >= 500) ?? logs[0];
+      const log =
+        logs.find((item) => ["error", "fatal"].includes(String(item.level).toLowerCase()) || numberValue(item.statusCode) >= 500) ??
+        logs[0];
       if (!log) {
         setStatus("No logs available for this service and range");
         setEvaluation(undefined);
@@ -212,19 +281,49 @@ export function AlertRulesPage() {
     }
   }
 
+  async function applyRecommendedRules() {
+    if (!selectedOrgId || !selectedServiceId) {
+      setStatus("Select an organization and service before applying recommended rules.");
+      return;
+    }
+    setLoading(true);
+    setStatus("Creating recommended alert rules");
+    try {
+      for (const rule of recommendedRulesFor(selectedService)) {
+        await createAlertRule({
+          organizationId: selectedOrgId,
+          serviceId: selectedServiceId,
+          ...rule,
+          enabled: true
+        });
+      }
+      await load(selectedOrgId);
+      setStatus("Recommended alert rules created");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Recommended rule creation failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="grid gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Alert Rules</h2>
-          <p className="mt-1 text-sm text-slate-400">Create, evaluate, toggle, and delete threshold rules using live telemetry.</p>
+          <p className="mt-1 text-sm text-text-soft">Create, evaluate, toggle, and delete threshold rules using live telemetry.</p>
         </div>
-        <Button disabled={loading} icon={<RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />} onClick={() => load()}>
-          Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button disabled={loading || !selectedServiceId} icon={<Play className="h-4 w-4" />} onClick={applyRecommendedRules}>
+            Use recommended rules
+          </Button>
+          <Button disabled={loading} icon={<RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />} onClick={() => load()}>
+            Refresh
+          </Button>
+        </div>
       </div>
 
-      {status ? <div className="rounded-lg border border-line bg-panel-soft p-3 text-sm text-slate-300">{status}</div> : null}
+      {status ? <div className="aegis-glass rounded-2xl p-3 text-sm text-text-soft">{status}</div> : null}
 
       <div className="grid gap-3 md:grid-cols-4">
         <StatCard label="Rules" value={scopedRules.length} detail="selected organization" />
@@ -235,15 +334,32 @@ export function AlertRulesPage() {
 
       <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <form onSubmit={submit}>
-          <Card title="Create Rule" description="Attach a threshold rule to a service." action={<ActivitySquare className="h-5 w-5 text-amber" />}>
+          <Card
+            title="Create Rule"
+            description="Attach a threshold rule to a service."
+            action={<ActivitySquare className="h-5 w-5 text-amber" />}
+          >
             <div className="grid gap-3">
               <Select value={selectedOrgId} onChange={(event) => load(event.target.value)} aria-label="Organization">
                 <option value="">Select organization</option>
-                {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
               </Select>
               <Input name="name" required placeholder="Rule name" />
-              <Select name="serviceId" value={selectedServiceId} onChange={(event) => setSelectedServiceId(event.target.value)} aria-label="Service">
-                {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+              <Select
+                name="serviceId"
+                value={selectedServiceId}
+                onChange={(event) => setSelectedServiceId(event.target.value)}
+                aria-label="Service"
+              >
+                {services.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.name}
+                  </option>
+                ))}
               </Select>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Select name="metric" aria-label="Metric">
@@ -269,7 +385,12 @@ export function AlertRulesPage() {
                 <option value="medium">medium</option>
                 <option value="low">low</option>
               </Select>
-              <Button type="submit" variant="primary" disabled={loading || !selectedOrgId || !selectedServiceId} icon={<Plus className="h-4 w-4" />}>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={loading || !selectedOrgId || !selectedServiceId}
+                icon={<Plus className="h-4 w-4" />}
+              >
                 Create Rule
               </Button>
             </div>
@@ -282,20 +403,28 @@ export function AlertRulesPage() {
             description="Evaluation reads metric aggregates and logs for the selected service and time range."
             action={
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" disabled={loading || !selectedServiceId} icon={<Play className="h-4 w-4" />} onClick={runEvaluation}>Metrics</Button>
-                <Button size="sm" disabled={loading || !selectedServiceId} icon={<Play className="h-4 w-4" />} onClick={runLogEvaluation}>Logs</Button>
+                <Button size="sm" disabled={loading || !selectedServiceId} icon={<Play className="h-4 w-4" />} onClick={runEvaluation}>
+                  Metrics
+                </Button>
+                <Button size="sm" disabled={loading || !selectedServiceId} icon={<Play className="h-4 w-4" />} onClick={runLogEvaluation}>
+                  Logs
+                </Button>
               </div>
             }
           >
             <div className="grid gap-3 md:grid-cols-2">
               {scopedRules.map((rule) => (
-                <div key={rule.id} className="rounded-lg border border-line bg-panel-soft p-4">
+                <div key={rule.id} className="aegis-glass rounded-2xl p-4">
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-white">{rule.name}</p>
-                      <p className="mt-1 font-mono text-xs text-slate-400">{rule.metric} {rule.operator} {rule.threshold}</p>
+                      <p className="mt-1 font-mono text-xs text-text-soft">
+                        {rule.metric} {rule.operator} {rule.threshold}
+                      </p>
                     </div>
-                    <span className={`rounded border px-2 py-0.5 text-[10px] uppercase ${severityClasses[rule.severity] ?? severityClasses.medium}`}>
+                    <span
+                      className={`rounded border px-2 py-0.5 text-[10px] uppercase ${severityClasses[rule.severity] ?? severityClasses.medium}`}
+                    >
                       {rule.severity}
                     </span>
                   </div>
@@ -305,19 +434,45 @@ export function AlertRulesPage() {
                       <Button size="sm" disabled={loading} onClick={() => toggleRule(rule)}>
                         {rule.enabled ? "Disable" : "Enable"}
                       </Button>
-                      <Button size="sm" variant="danger" disabled={loading} icon={<Trash2 className="h-4 w-4" />} onClick={() => removeRule(rule)}>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={loading}
+                        icon={<Trash2 className="h-4 w-4" />}
+                        onClick={() => removeRule(rule)}
+                      >
                         Delete
                       </Button>
                     </div>
                   </div>
                 </div>
               ))}
-              {scopedRules.length === 0 ? <p className="text-sm text-slate-500">No alert rules yet for this organization.</p> : null}
+              {scopedRules.length === 0 ? (
+                <div className="md:col-span-2">
+                  <EmptyState
+                    title="No alert rules configured"
+                    description="Start with a simple rule like p95 latency > 2s or error rate > 5%."
+                    action={
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="primary" disabled={loading || !selectedServiceId} onClick={applyRecommendedRules}>
+                          Use recommended rules
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => setStatus("Choose a service, then create p95 latency > 2000ms or error_rate > 5%.")}
+                        >
+                          View alert examples
+                        </Button>
+                      </div>
+                    }
+                  />
+                </div>
+              ) : null}
             </div>
           </Card>
 
           {evaluation ? (
-            <pre className="max-h-80 overflow-auto rounded-lg border border-line bg-panel-soft p-4 text-xs text-slate-300">
+            <pre className="max-h-80 overflow-auto aegis-glass rounded-2xl p-4 text-xs text-text-soft">
               {JSON.stringify(evaluation, null, 2)}
             </pre>
           ) : null}

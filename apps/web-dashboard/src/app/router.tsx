@@ -7,6 +7,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 type RoutePageProps = {
   health?: Record<string, HealthResult>;
   onNavigate?: (label: string) => void;
+  onAuthenticated?: (mode: "login" | "register") => void;
 };
 
 type RouteDefinition = {
@@ -14,8 +15,23 @@ type RouteDefinition = {
   component: ComponentType<RoutePageProps>;
 };
 
+type PublicRouteDefinition = {
+  path: string;
+  component: ComponentType<RoutePageProps>;
+};
+
 const route = <T extends Record<string, any>>(loader: () => Promise<T>, exportName: keyof T) =>
   lazy(async () => ({ default: (await loader())[exportName] as ComponentType<RoutePageProps> }));
+
+const LandingPage = route(() => import("../features/marketing/MarketingPages"), "LandingPage");
+const ProductPage = route(() => import("../features/marketing/MarketingPages"), "ProductPage");
+const SolutionsPage = route(() => import("../features/marketing/MarketingPages"), "SolutionsPage");
+const PricingPage = route(() => import("../features/marketing/MarketingPages"), "PricingPage");
+const UseCasesPage = route(() => import("../features/marketing/MarketingPages"), "UseCasesPage");
+const DocsPage = route(() => import("../features/docs/DocsPage"), "DocsPage");
+const LoginPage = route(() => import("../features/auth/AuthRoutePage"), "LoginPage");
+const RegisterPage = route(() => import("../features/auth/AuthRoutePage"), "RegisterPage");
+const OnboardingPage = route(() => import("../features/onboarding/OnboardingPage"), "OnboardingPage");
 
 const OverviewPage = route(() => import("../features/overview/OverviewPage"), "OverviewPage");
 const ConnectProjectPage = route(() => import("../features/connect/ConnectProjectPage"), "ConnectProjectPage");
@@ -40,6 +56,18 @@ const NotificationsPage = route(() => import("../features/notifications/Notifica
 const TeamMembersPage = route(() => import("../features/team/TeamMembersPage"), "TeamMembersPage");
 const AuditLogsPage = route(() => import("../features/audit/AuditLogsPage"), "AuditLogsPage");
 const SettingsPage = route(() => import("../features/settings/SettingsPage"), "SettingsPage");
+
+export const publicRouteDefinitions: PublicRouteDefinition[] = [
+  { path: "/", component: LandingPage },
+  { path: "/product", component: ProductPage },
+  { path: "/solutions", component: SolutionsPage },
+  { path: "/pricing", component: PricingPage },
+  { path: "/docs", component: DocsPage },
+  { path: "/customers", component: UseCasesPage },
+  { path: "/use-cases", component: UseCasesPage },
+  { path: "/login", component: LoginPage },
+  { path: "/register", component: RegisterPage }
+];
 
 const routeDefinitions: RouteDefinition[] = [
   { label: "Overview", component: OverviewPage },
@@ -67,7 +95,38 @@ const routeDefinitions: RouteDefinition[] = [
   { label: "Settings", component: SettingsPage }
 ];
 
-export function RouteView({ activeNav, health, onNavigate }: { activeNav: string; health: Record<string, HealthResult>; onNavigate: (label: string) => void }) {
+export function PublicRouteView({ path, onAuthenticated }: { path: string; onAuthenticated: (mode: "login" | "register") => void }) {
+  const routeDefinition = publicRouteDefinitions.find((item) => item.path === path) ?? publicRouteDefinitions[0];
+  const Page = routeDefinition.component;
+
+  return (
+    <ErrorBoundary key={path}>
+      <Suspense fallback={<PageSkeleton />}>
+        <Page onAuthenticated={onAuthenticated} />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
+export function OnboardingRouteView({ onNavigate }: { onNavigate: (label: string) => void }) {
+  return (
+    <ErrorBoundary key="onboarding">
+      <Suspense fallback={<PageSkeleton />}>
+        <OnboardingPage onNavigate={onNavigate} />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
+export function RouteView({
+  activeNav,
+  health,
+  onNavigate
+}: {
+  activeNav: string;
+  health: Record<string, HealthResult>;
+  onNavigate: (label: string) => void;
+}) {
   const routeDefinition = routeDefinitions.find((item) => item.label === activeNav) ?? routeDefinitions[0];
   const Page = routeDefinition.component;
 

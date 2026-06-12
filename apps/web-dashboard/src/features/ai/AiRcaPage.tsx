@@ -54,11 +54,7 @@ export function AiRcaPage() {
     setLoading(true);
     setStatus("");
     try {
-      const [incidentRows, serviceRows, deploymentRows] = await Promise.all([
-        fetchIncidents(),
-        fetchServices(),
-        fetchDeployments()
-      ]);
+      const [incidentRows, serviceRows, deploymentRows] = await Promise.all([fetchIncidents(), fetchServices(), fetchDeployments()]);
       const envServices = serviceRows.filter((service) => service.environment === environment);
       setIncidents(incidentRows);
       setServices(envServices.length ? envServices : serviceRows);
@@ -157,14 +153,14 @@ export function AiRcaPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">AI RCA</h2>
-          <p className="mt-1 text-sm text-slate-400">Run root-cause analysis against selected incident telemetry and recent deployments.</p>
+          <p className="mt-1 text-sm text-text-soft">Run root-cause analysis against selected incident telemetry and recent deployments.</p>
         </div>
         <Button icon={<RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />} disabled={loading} onClick={load}>
           Refresh Context
         </Button>
       </div>
 
-      {status ? <div className="rounded-lg border border-line bg-panel-soft p-3 text-sm text-slate-300">{status}</div> : null}
+      {status ? <div className="aegis-glass rounded-2xl p-3 text-sm text-text-soft">{status}</div> : null}
 
       <div className="grid gap-3 md:grid-cols-4">
         <StatCard label="Incidents" value={incidents.length} detail="available for RCA" />
@@ -174,17 +170,34 @@ export function AiRcaPage() {
       </div>
 
       <form onSubmit={submit} className="grid gap-5 xl:grid-cols-[420px_1fr]">
-        <Card title="Analysis Context" description="Select real incident and service data from the platform." action={<BrainCircuit className="h-5 w-5 text-amber" />}>
+        <Card
+          title="Analysis Context"
+          description="Select real incident and service data from the platform."
+          action={<BrainCircuit className="h-5 w-5 text-amber" />}
+        >
           <div className="grid gap-3">
             <Select value={incidentId} onChange={(event) => setIncidentId(event.target.value)} aria-label="Incident">
               <option value="">Select incident</option>
-              {incidents.map((incident) => <option key={incident.id} value={incident.id}>{incident.title}</option>)}
+              {incidents.map((incident) => (
+                <option key={incident.id} value={incident.id}>
+                  {incident.title}
+                </option>
+              ))}
             </Select>
             <Select value={serviceId} onChange={(event) => setServiceId(event.target.value)} aria-label="Service">
               <option value="">Select service</option>
-              {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
             </Select>
-            <Textarea value={operatorNotes} onChange={(event) => setOperatorNotes(event.target.value)} placeholder="Optional operator notes from the current investigation" aria-label="Operator notes" />
+            <Textarea
+              value={operatorNotes}
+              onChange={(event) => setOperatorNotes(event.target.value)}
+              placeholder="Optional operator notes from the current investigation"
+              aria-label="Operator notes"
+            />
             <div className="flex flex-wrap gap-2">
               <Button type="submit" variant="primary" disabled={loading || !incidentId} icon={<Sparkles className="h-4 w-4" />}>
                 Analyze
@@ -205,21 +218,21 @@ export function AiRcaPage() {
                   <SeverityBadge severity={selectedIncident.severity} />
                   <StatusBadge status={selectedIncident.status} />
                 </div>
-                <p className="text-sm text-slate-400">{selectedIncident.summary ?? "No incident summary recorded."}</p>
-                <p className="text-xs text-slate-500">Created {new Date(selectedIncident.createdAt).toLocaleString()}</p>
+                <p className="text-sm text-text-soft">{selectedIncident.summary ?? "No incident summary recorded."}</p>
+                <p className="text-xs text-text-muted">Created {new Date(selectedIncident.createdAt).toLocaleString()}</p>
               </div>
             ) : (
-              <p className="text-sm text-slate-500">No incident selected.</p>
+              <p className="text-sm text-text-muted">No incident selected.</p>
             )}
           </Card>
 
           <Card title="Analysis Result" description="Returned by the AI RCA service.">
             {result ? (
-              <pre className="max-h-[460px] overflow-auto rounded-lg border border-line bg-panel-soft p-4 text-xs leading-5 text-slate-300">
+              <pre className="max-h-[460px] overflow-auto aegis-glass rounded-2xl p-4 text-xs leading-5 text-text-soft">
                 {JSON.stringify(result, null, 2)}
               </pre>
             ) : (
-              <p className="text-sm text-slate-500">Run analysis to populate this panel.</p>
+              <p className="text-sm text-text-muted">Run analysis to populate this panel.</p>
             )}
           </Card>
         </div>

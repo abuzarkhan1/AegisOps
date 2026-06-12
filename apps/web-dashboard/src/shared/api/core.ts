@@ -401,6 +401,13 @@ export async function fetchIncidents(params?: Record<string, string | number | u
   return data.incidents;
 }
 
+export async function createIncident(payload: Record<string, unknown>) {
+  return request<{ incident: IncidentRecord }>(`${coreApiUrl}/api/incidents`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function fetchOrganizations() {
   const data = await request<{ organizations: OrganizationRecord[] }>(`${coreApiUrl}/api/organizations`);
   return data.organizations;
@@ -796,7 +803,9 @@ export async function fetchIncidentTimeline(incidentId: string) {
 }
 
 export async function fetchIncidentAnalysis(incidentId: string) {
-  const data = await request<{ analysis: IncidentAnalysisRecord[]; status: string }>(`${coreApiUrl}/api/incidents/${incidentId}/ai-analysis`);
+  const data = await request<{ analysis: IncidentAnalysisRecord[]; status: string }>(
+    `${coreApiUrl}/api/incidents/${incidentId}/ai-analysis`
+  );
   return data;
 }
 

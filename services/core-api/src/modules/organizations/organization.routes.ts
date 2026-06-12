@@ -11,7 +11,13 @@ export const organizationRouter = Router();
 
 organizationRouter.get(
   "/",
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const scopedOrgId = typeof req.query.organizationId === "string" ? req.query.organizationId : undefined;
+    if (scopedOrgId) {
+      const organization = await platformRepository.getOrganization(scopedOrgId);
+      res.json({ organizations: organization ? [organization] : [] });
+      return;
+    }
     res.json({ organizations: await platformRepository.listOrganizations() });
   })
 );

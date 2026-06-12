@@ -26,7 +26,7 @@ type IssueRow = {
   detail?: string;
 };
 
-const issueTone = (type: IssueRow["type"]) => type === "incident" ? "text-rose" : type === "log" ? "text-amber" : "text-mint";
+const issueTone = (type: IssueRow["type"]) => (type === "incident" ? "text-rose" : type === "log" ? "text-amber" : "text-white");
 
 export function IssuesPage() {
   const { environment, fromIso } = useWorkspace();
@@ -89,16 +89,18 @@ export function IssuesPage() {
       createdAt: log.timestamp,
       detail: `${log.route ?? "unknown route"} ${log.traceId ?? ""}`.trim()
     }));
-    const alertIssues = rules.filter((rule) => rule.enabled).map((rule) => ({
-      id: rule.id,
-      type: "alert" as const,
-      title: rule.name,
-      severity: rule.severity,
-      status: `${rule.metric} ${rule.operator} ${rule.threshold}`,
-      serviceId: rule.serviceId,
-      serviceName: rule.serviceId ? servicesById.get(rule.serviceId)?.name : undefined,
-      detail: `${rule.durationSeconds}s window`
-    }));
+    const alertIssues = rules
+      .filter((rule) => rule.enabled)
+      .map((rule) => ({
+        id: rule.id,
+        type: "alert" as const,
+        title: rule.name,
+        severity: rule.severity,
+        status: `${rule.metric} ${rule.operator} ${rule.threshold}`,
+        serviceId: rule.serviceId,
+        serviceName: rule.serviceId ? servicesById.get(rule.serviceId)?.name : undefined,
+        detail: `${rule.durationSeconds}s window`
+      }));
     return [...incidentIssues, ...logIssues, ...alertIssues].filter((issue) => typeFilter === "all" || issue.type === typeFilter);
   }, [incidents, logs, rules, servicesById, typeFilter]);
 
@@ -111,11 +113,13 @@ export function IssuesPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Issues</h2>
-          <p className="mt-1 text-sm text-slate-400">Unified queue from active incidents, alert rules, and error logs.</p>
+          <p className="mt-1 text-sm text-text-soft">Unified queue from active incidents, alert rules, and error logs.</p>
         </div>
-        <Button icon={<RefreshCw className="h-4 w-4" />} disabled={loading} onClick={load}>Refresh</Button>
+        <Button icon={<RefreshCw className="h-4 w-4" />} disabled={loading} onClick={load}>
+          Refresh
+        </Button>
       </div>
-      {error ? <div className="rounded-lg border border-rose/40 bg-rose/10 p-3 text-sm text-rose">{error}</div> : null}
+      {error ? <div className="rounded-2xl border border-rose/40 bg-rose/10 p-3 text-sm text-rose">{error}</div> : null}
 
       <div className="grid gap-3 md:grid-cols-4">
         <StatCard label="Open issues" value={issues.length} detail={`environment: ${environment}`} />
@@ -132,13 +136,13 @@ export function IssuesPage() {
                 key={type}
                 type="button"
                 onClick={() => setTypeFilter(type)}
-                className={`h-9 rounded-md border px-3 text-xs font-semibold ${typeFilter === type ? "border-mint bg-mint/10 text-mint" : "border-line bg-panel-soft text-slate-400 hover:text-white"}`}
+                className={`h-9 rounded-full border px-3 text-xs font-semibold ${typeFilter === type ? "border-white/40 bg-white/10 text-white" : "border-white/10 bg-white/5 text-text-soft hover:text-white"}`}
               >
                 {type}
               </button>
             ))}
           </div>
-          <p className="text-xs text-slate-500">Error logs since {new Date(fromIso).toLocaleString()}</p>
+          <p className="text-xs text-text-muted">Error logs since {new Date(fromIso).toLocaleString()}</p>
         </div>
       </Card>
 
@@ -148,18 +152,30 @@ export function IssuesPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  {issue.type === "incident" ? <ShieldAlert className={`h-4 w-4 ${issueTone(issue.type)}`} /> : issue.type === "log" ? <FileWarning className={`h-4 w-4 ${issueTone(issue.type)}`} /> : <AlertCircle className={`h-4 w-4 ${issueTone(issue.type)}`} />}
+                  {issue.type === "incident" ? (
+                    <ShieldAlert className={`h-4 w-4 ${issueTone(issue.type)}`} />
+                  ) : issue.type === "log" ? (
+                    <FileWarning className={`h-4 w-4 ${issueTone(issue.type)}`} />
+                  ) : (
+                    <AlertCircle className={`h-4 w-4 ${issueTone(issue.type)}`} />
+                  )}
                   <h3 className="truncate text-sm font-semibold text-white">{issue.title}</h3>
                   <SeverityBadge severity={issue.severity} />
                   <StatusBadge status={issue.status} />
                 </div>
-                <p className="mt-2 text-sm text-slate-400">{issue.serviceName ?? "unmapped service"} {issue.detail ? `/ ${issue.detail}` : ""}</p>
+                <p className="mt-2 text-sm text-text-soft">
+                  {issue.serviceName ?? "unmapped service"} {issue.detail ? `/ ${issue.detail}` : ""}
+                </p>
               </div>
-              <span className="rounded-md border border-line bg-panel-soft px-2 py-1 text-xs text-slate-400">{issue.type}</span>
+              <span className="rounded-2xl border border-white/10 bg-white/5 px-2 py-1 text-xs text-text-soft">{issue.type}</span>
             </div>
           </Card>
         ))}
-        {issues.length === 0 ? <Card><p className="text-sm text-slate-500">No issues matched the active workspace filters.</p></Card> : null}
+        {issues.length === 0 ? (
+          <Card>
+            <p className="text-sm text-text-muted">No issues matched the active workspace filters.</p>
+          </Card>
+        ) : null}
       </div>
     </div>
   );

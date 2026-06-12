@@ -12,7 +12,9 @@ export function ServicesPage() {
   const [error, setError] = useState<string>();
 
   useEffect(() => {
-    fetchServices().then(setServices).catch((err) => setError(err instanceof Error ? err.message : "Failed to load services"));
+    fetchServices()
+      .then(setServices)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load services"));
   }, []);
 
   if (selectedServiceId) {
@@ -20,13 +22,13 @@ export function ServicesPage() {
   }
 
   return (
-    <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+    <div className="aegis-glass rounded-2xl p-4 shadow-panel">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">Services</h2>
-          <p className="text-sm text-slate-400">Monitored service catalog</p>
+          <p className="text-sm text-text-soft">Monitored service catalog</p>
         </div>
-        <Server className="h-5 w-5 text-mint" aria-hidden="true" />
+        <Server className="h-5 w-5 text-white" aria-hidden="true" />
       </div>
       {error ? <EmptyState title={error} /> : null}
       {!error && services.length === 0 ? <EmptyState title="No services found" /> : null}
@@ -35,17 +37,17 @@ export function ServicesPage() {
           <div
             key={service.id}
             onClick={() => setSelectedServiceId(service.id)}
-            className="rounded-lg border border-line bg-panel-soft p-4 cursor-pointer hover:border-line transition-all flex flex-col justify-between"
+            className="aegis-glass rounded-2xl p-4 cursor-pointer hover:border-white/10 transition-all flex flex-col justify-between"
           >
             <div>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="truncate text-sm font-medium text-white">{service.name}</p>
                 <StatusPill status={service.healthStatus === "healthy" ? "ok" : "degraded"} />
               </div>
-              <p className="truncate text-xs text-slate-400">{service.repositoryUrl ?? service.language ?? service.id}</p>
+              <p className="truncate text-xs text-text-soft">{service.repositoryUrl ?? service.language ?? service.id}</p>
             </div>
             <div className="mt-4 flex justify-end">
-              <span className="inline-flex items-center gap-1 text-xs text-mint hover:underline font-semibold">
+              <span className="inline-flex items-center gap-1 text-xs text-white hover:underline font-semibold">
                 Open Telemetry Dashboard <ExternalLink className="h-3 w-3" />
               </span>
             </div>

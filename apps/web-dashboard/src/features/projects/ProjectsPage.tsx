@@ -34,7 +34,10 @@ export function ProjectsPage() {
   const selectedOrgId = organizations[0]?.id ?? "";
   const selectedProject = useMemo(() => projects.find((project) => project.id === selectedProjectId), [projects, selectedProjectId]);
   const projectServices = services.filter((service) => service.projectId === selectedProjectId);
-  const managedService = useMemo(() => projectServices.find((service) => service.id === managedServiceId) ?? projectServices[0], [managedServiceId, projectServices]);
+  const managedService = useMemo(
+    () => projectServices.find((service) => service.id === managedServiceId) ?? projectServices[0],
+    [managedServiceId, projectServices]
+  );
 
   async function load() {
     const [orgs, projectList, serviceList] = await Promise.all([fetchOrganizations(), fetchProjects(), fetchServices()]);
@@ -192,31 +195,44 @@ export function ProjectsPage() {
   return (
     <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
       <div className="space-y-4">
-        <form onSubmit={submitProject} className="rounded-lg border border-line bg-panel p-5 shadow-panel">
+        <form onSubmit={submitProject} className="aegis-glass rounded-2xl p-5 shadow-panel">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold text-white">Projects</h2>
-            <FolderKanban className="h-5 w-5 text-mint" />
+            <FolderKanban className="h-5 w-5 text-white" />
           </div>
           <div className="grid gap-3">
-            <input name="name" required placeholder="Project name" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
-            <input name="projectKey" placeholder="project-key" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
-            <select name="environment" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
+            <input
+              name="name"
+              required
+              placeholder="Project name"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+            />
+            <input
+              name="projectKey"
+              placeholder="project-key"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+            />
+            <select name="environment" className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm">
               <option value="dev">dev</option>
               <option value="staging">staging</option>
               <option value="production">production</option>
             </select>
-            <input name="description" placeholder="Description" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
-            <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950">
+            <input
+              name="description"
+              placeholder="Description"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+            />
+            <button className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black">
               <Plus className="h-4 w-4" />
               Create Project
             </button>
           </div>
         </form>
 
-        <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
+        <div className="aegis-glass rounded-2xl p-5 shadow-panel">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white">Project Catalog</h3>
-            <span className="text-xs text-slate-400">{projects.length}</span>
+            <span className="text-xs text-text-soft">{projects.length}</span>
           </div>
           <div className="space-y-2">
             {projects.map((project) => {
@@ -226,20 +242,22 @@ export function ProjectsPage() {
                 <div
                   key={project.id}
                   onClick={() => setSelectedProjectId(project.id)}
-                  className={`w-full rounded-md border p-3 text-left text-sm cursor-pointer transition-all ${
-                    selectedProjectId === project.id ? "border-mint/50 bg-mint/10" : "border-line bg-panel-soft hover:border-line"
+                  className={`w-full rounded-full border p-3 text-left text-sm cursor-pointer transition-all ${
+                    selectedProjectId === project.id ? "border-white/40 bg-white/10" : "border-white/10 bg-white/5 hover:border-white/10"
                   }`}
                 >
                   <span className="block truncate font-medium text-white">{project.name}</span>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-slate-400">{project.projectKey ?? project.environment} · {mode}</span>
+                    <span className="text-xs text-text-soft">
+                      {project.projectKey ?? project.environment} · {mode}
+                    </span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedProjectId(project.id);
                         setViewingProjectDetail(true);
                       }}
-                      className="inline-flex items-center gap-1 text-xs text-mint hover:underline"
+                      className="inline-flex items-center gap-1 text-xs text-white hover:underline"
                     >
                       Open Dashboard <ExternalLink className="h-3 w-3" />
                     </button>
@@ -252,37 +270,76 @@ export function ProjectsPage() {
         </div>
 
         {selectedProject ? (
-          <form key={selectedProject.id} onSubmit={submitProjectUpdate} className="rounded-lg border border-line bg-panel p-5 shadow-panel">
+          <form key={selectedProject.id} onSubmit={submitProjectUpdate} className="aegis-glass rounded-2xl p-5 shadow-panel">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white">Project Settings</h3>
-                <p className="text-xs text-slate-400">Update selected project metadata</p>
+                <p className="text-xs text-text-soft">Update selected project metadata</p>
               </div>
             </div>
             <div className="grid gap-3">
-              <input name="name" required defaultValue={selectedProject.name} className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
-              <input name="projectKey" defaultValue={selectedProject.projectKey ?? ""} className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
-              <select name="environment" defaultValue={selectedProject.environment} className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
+              <input
+                name="name"
+                required
+                defaultValue={selectedProject.name}
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              />
+              <input
+                name="projectKey"
+                defaultValue={selectedProject.projectKey ?? ""}
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              />
+              <select
+                name="environment"
+                defaultValue={selectedProject.environment}
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              >
                 <option value="dev">dev</option>
                 <option value="development">development</option>
                 <option value="staging">staging</option>
                 <option value="production">production</option>
               </select>
-              <select name="projectType" defaultValue={selectedProject.projectType ?? "microservices"} className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
+              <select
+                name="projectType"
+                defaultValue={selectedProject.projectType ?? "microservices"}
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              >
                 <option value="monolith">monolith</option>
                 <option value="microservices">microservices</option>
                 <option value="worker-queue">worker-queue</option>
                 <option value="frontend">frontend</option>
                 <option value="hybrid">hybrid</option>
               </select>
-              <input name="repositoryUrl" defaultValue={selectedProject.repositoryUrl ?? ""} placeholder="Repository URL" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
-              <input name="ownerTeam" defaultValue={selectedProject.ownerTeam ?? ""} placeholder="Owner team" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
-              <input name="description" defaultValue={selectedProject.description ?? ""} placeholder="Description" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
+              <input
+                name="repositoryUrl"
+                defaultValue={selectedProject.repositoryUrl ?? ""}
+                placeholder="Repository URL"
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              />
+              <input
+                name="ownerTeam"
+                defaultValue={selectedProject.ownerTeam ?? ""}
+                placeholder="Owner team"
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              />
+              <input
+                name="description"
+                defaultValue={selectedProject.description ?? ""}
+                placeholder="Description"
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              />
               <div className="grid gap-2 sm:grid-cols-2">
-                <button type="submit" className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950">
+                <button
+                  type="submit"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black"
+                >
                   Save Project
                 </button>
-                <button type="button" onClick={removeProject} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-rose/40 bg-rose/10 px-4 text-sm font-semibold text-rose hover:bg-rose/20">
+                <button
+                  type="button"
+                  onClick={removeProject}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-rose/40 bg-rose/10 px-4 text-sm font-semibold text-rose hover:bg-rose/20"
+                >
                   Delete Project
                 </button>
               </div>
@@ -292,17 +349,22 @@ export function ProjectsPage() {
       </div>
 
       <div className="space-y-4">
-        <form onSubmit={submitService} className="rounded-lg border border-line bg-panel p-5 shadow-panel">
+        <form onSubmit={submitService} className="aegis-glass rounded-2xl p-5 shadow-panel">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold text-white">{selectedProject?.name ?? "Project Services"}</h2>
-              <p className="text-xs text-slate-400">{selectedProject?.environment ?? "select a project"}</p>
+              <p className="text-xs text-text-soft">{selectedProject?.environment ?? "select a project"}</p>
             </div>
             <Server className="h-5 w-5 text-amber" />
           </div>
           <div className="grid gap-3 md:grid-cols-[1fr_140px_140px]">
-            <input name="name" required placeholder="Service name" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
-            <select name="serviceType" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
+            <input
+              name="name"
+              required
+              placeholder="Service name"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+            />
+            <select name="serviceType" className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm">
               <option value="api">api</option>
               <option value="frontend">frontend</option>
               <option value="worker">worker</option>
@@ -313,52 +375,72 @@ export function ProjectsPage() {
               <option value="message-broker">message-broker</option>
               <option value="external">external</option>
             </select>
-            <select name="language" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
+            <select name="language" className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm">
               <option value="node">node</option>
               <option value="go">go</option>
               <option value="python">python</option>
               <option value="java">java</option>
             </select>
-            <input name="repositoryUrl" placeholder="Repository URL" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm md:col-span-2" />
-            <button disabled={!selectedProjectId} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber px-4 text-sm font-semibold text-slate-950 disabled:opacity-50">
+            <input
+              name="repositoryUrl"
+              placeholder="Repository URL"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm md:col-span-2"
+            />
+            <button
+              disabled={!selectedProjectId}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-amber px-4 text-sm font-semibold text-black disabled:opacity-50"
+            >
               <Plus className="h-4 w-4" />
               Add Service
             </button>
           </div>
         </form>
 
-        <div className="rounded-lg border border-line bg-panel p-5 shadow-panel">
+        <div className="aegis-glass rounded-2xl p-5 shadow-panel">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-white">Services</h3>
-            <Wand2 className="h-4 w-4 text-slate-400" />
+            <Wand2 className="h-4 w-4 text-text-soft" />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {projectServices.map((service) => (
-              <div key={service.id} className={`rounded-lg border bg-panel-soft p-4 ${managedService?.id === service.id ? "border-mint/50" : "border-line"}`}>
+              <div
+                key={service.id}
+                className={`rounded-2xl border bg-white/5 p-4 ${managedService?.id === service.id ? "border-white/40" : "border-white/10"}`}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <button
                       onClick={() => setViewingServiceId(service.id)}
-                      className="truncate text-sm font-semibold text-white hover:text-mint hover:underline text-left block"
+                      className="truncate text-sm font-semibold text-white hover:text-white hover:underline text-left block"
                     >
                       {service.name}
                     </button>
-                    <p className="mt-1 text-xs text-slate-400">{service.serviceType ?? "api"} · {service.language ?? "runtime"}</p>
+                    <p className="mt-1 text-xs text-text-soft">
+                      {service.serviceType ?? "api"} · {service.language ?? "runtime"}
+                    </p>
                   </div>
                   <div className="flex gap-2">
-                    <button title="Manage service" onClick={() => setManagedServiceId(service.id)} className="rounded-md border border-line bg-panel px-2 text-xs text-slate-300 hover:text-white">
+                    <button
+                      title="Manage service"
+                      onClick={() => setManagedServiceId(service.id)}
+                      className="rounded-full border border-white/10 bg-white/5 px-2 text-xs text-text-soft hover:text-white"
+                    >
                       Manage
                     </button>
-                    <button title="Generate API key" onClick={() => generateKey(service)} className="grid h-9 w-9 place-items-center rounded-md border border-line bg-panel-soft text-slate-300 hover:text-white">
+                    <button
+                      title="Generate API key"
+                      onClick={() => generateKey(service)}
+                      className="grid h-9 w-9 place-items-center rounded-2xl border border-white/10 bg-white/5 text-text-soft hover:text-white"
+                    >
                       <KeyRound className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
-                <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                <div className="mt-3 flex items-center justify-between text-xs text-text-muted">
                   <span className="truncate max-w-[180px]">{service.repositoryUrl ?? service.id}</span>
                   <button
                     onClick={() => setViewingServiceId(service.id)}
-                    className="inline-flex items-center gap-1 text-mint hover:underline"
+                    className="inline-flex items-center gap-1 text-white hover:underline"
                   >
                     View Details <ExternalLink className="h-3 w-3" />
                   </button>
@@ -369,31 +451,44 @@ export function ProjectsPage() {
           </div>
         </div>
 
-        {status ? <p className="text-sm text-slate-300">{status}</p> : null}
+        {status ? <p className="text-sm text-text-soft">{status}</p> : null}
         {generatedKey ? (
-          <div className="rounded-lg border border-mint/30 bg-mint/10 p-4">
-            <p className="text-xs font-semibold uppercase text-mint">New API Key</p>
-            <p className="mt-2 break-all font-mono text-xs text-slate-200">{generatedKey}</p>
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-4">
+            <p className="text-xs font-semibold uppercase text-white">New API Key</p>
+            <p className="mt-2 break-all font-mono text-xs text-text-primary">{generatedKey}</p>
           </div>
         ) : null}
 
         {managedService ? (
-          <form key={managedService.id} onSubmit={submitServiceUpdate} className="rounded-lg border border-line bg-panel p-5 shadow-panel">
+          <form key={managedService.id} onSubmit={submitServiceUpdate} className="aegis-glass rounded-2xl p-5 shadow-panel">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white">Service Settings</h3>
-                <p className="text-xs text-slate-400">{managedService.name}</p>
+                <p className="text-xs text-text-soft">{managedService.name}</p>
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <input name="name" required defaultValue={managedService.name} className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
-              <select name="environment" defaultValue={managedService.environment} className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
+              <input
+                name="name"
+                required
+                defaultValue={managedService.name}
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              />
+              <select
+                name="environment"
+                defaultValue={managedService.environment}
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              >
                 <option value="dev">dev</option>
                 <option value="development">development</option>
                 <option value="staging">staging</option>
                 <option value="production">production</option>
               </select>
-              <select name="serviceType" defaultValue={managedService.serviceType ?? "api"} className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
+              <select
+                name="serviceType"
+                defaultValue={managedService.serviceType ?? "api"}
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              >
                 <option value="api">api</option>
                 <option value="frontend">frontend</option>
                 <option value="worker">worker</option>
@@ -404,24 +499,44 @@ export function ProjectsPage() {
                 <option value="message-broker">message-broker</option>
                 <option value="external">external</option>
               </select>
-              <select name="language" defaultValue={managedService.language ?? ""} className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
+              <select
+                name="language"
+                defaultValue={managedService.language ?? ""}
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              >
                 <option value="">runtime</option>
                 <option value="node">node</option>
                 <option value="go">go</option>
                 <option value="python">python</option>
                 <option value="java">java</option>
               </select>
-              <select name="healthStatus" defaultValue={managedService.healthStatus} className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm">
+              <select
+                name="healthStatus"
+                defaultValue={managedService.healthStatus}
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              >
                 <option value="healthy">healthy</option>
                 <option value="degraded">degraded</option>
                 <option value="down">down</option>
                 <option value="unknown">unknown</option>
               </select>
-              <input name="repositoryUrl" defaultValue={managedService.repositoryUrl ?? ""} placeholder="Repository URL" className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm" />
-              <button type="submit" className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950">
+              <input
+                name="repositoryUrl"
+                defaultValue={managedService.repositoryUrl ?? ""}
+                placeholder="Repository URL"
+                className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm"
+              />
+              <button
+                type="submit"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black"
+              >
                 Save Service
               </button>
-              <button type="button" onClick={removeService} className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-rose/40 bg-rose/10 px-4 text-sm font-semibold text-rose hover:bg-rose/20">
+              <button
+                type="button"
+                onClick={removeService}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-rose/40 bg-rose/10 px-4 text-sm font-semibold text-rose hover:bg-rose/20"
+              >
                 Delete Service
               </button>
             </div>

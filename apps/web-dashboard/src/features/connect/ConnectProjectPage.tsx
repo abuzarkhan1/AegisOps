@@ -16,6 +16,7 @@ import {
   Trash2
 } from "lucide-react";
 import { coreApiUrl, gatewayUrl } from "../../app/config";
+import { Stepper } from "../../shared/ui/Progress";
 import {
   createApiKey,
   createProject,
@@ -215,8 +216,9 @@ export function ConnectProjectPage({ onNavigate }: ConnectProjectPageProps) {
     }
   }
 
-  const nodeSnippet = selectedService && selectedRawKey
-    ? `import express from "express";
+  const nodeSnippet =
+    selectedService && selectedRawKey
+      ? `import express from "express";
 import { aegisopsMiddleware, aegisopsErrorHandler } from "@aegisops/node";
 
 const app = express();
@@ -240,7 +242,7 @@ app.use(aegisopsErrorHandler());
 // curl http://localhost:7001/health
 // curl http://localhost:7001/api/orders
 // Then refresh connection status in AegisOps.`
-    : "";
+      : "";
 
   const pythonSnippet = `pip install -e packages/aegisops-python
 
@@ -369,38 +371,20 @@ AEGISOPS_ENVIRONMENT=${environment}`
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <div className="flex flex-col gap-3 border-b border-line pb-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 border-b border-white/10 pb-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-sm text-mint">
+          <div className="mb-2 flex items-center gap-2 text-sm text-white">
             <Cable className="h-4 w-4" aria-hidden="true" />
             <span>Connect Project</span>
           </div>
           <h2 className="text-2xl font-semibold text-white">Add a monitored project</h2>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {steps.map((item, index) => (
-            <button
-              key={item}
-              type="button"
-              title={item}
-              onClick={() => setStep(index)}
-              className={`h-9 rounded-md border px-3 text-xs transition ${
-                step === index ? "border-mint bg-mint/15 text-mint" : "border-line bg-panel-soft text-slate-300"
-              }`}
-            >
-              {index + 1}. {item}
-            </button>
-          ))}
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-panel-soft md:basis-full">
-          <div
-            className="h-full rounded-full bg-mint transition-all"
-            style={{ width: `${((step + 1) / steps.length) * 100}%` }}
-          />
+        <div className="w-full md:max-w-2xl">
+          <Stepper steps={steps} activeIndex={step} onStepChange={setStep} />
         </div>
       </div>
 
-      {error ? <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</div> : null}
+      {error ? <div className="rounded-full border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</div> : null}
 
       {step === 0 ? (
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -409,51 +393,72 @@ AEGISOPS_ENVIRONMENT=${environment}`
               key={item.value}
               type="button"
               onClick={() => selectProjectType(item.value)}
-              className={`min-h-44 rounded-lg border p-4 text-left transition ${
-                projectType === item.value ? "border-mint bg-mint/10" : "border-line bg-panel hover:border-slate-500"
+              className={`min-h-44 rounded-2xl border p-4 text-left transition ${
+                projectType === item.value ? "border-white/40 bg-white/10" : "border-white/10 bg-white/5 hover:border-slate-500"
               }`}
             >
-              <Server className="mb-4 h-5 w-5 text-mint" aria-hidden="true" />
+              <Server className="mb-4 h-5 w-5 text-white" aria-hidden="true" />
               <p className="text-base font-semibold text-white">{item.label}</p>
-              <p className="mt-2 text-sm leading-6 text-slate-400">{item.description}</p>
+              <p className="mt-2 text-sm leading-6 text-text-soft">{item.description}</p>
             </button>
           ))}
         </section>
       ) : null}
 
       {step === 1 ? (
-        <section className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+        <section className="aegis-glass rounded-2xl p-4 shadow-panel">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2 text-sm text-slate-300">
+            <label className="space-y-2 text-sm text-text-soft">
               <span>Project name</span>
-              <input className="w-full rounded-md border border-line bg-panel-soft px-3 py-2 text-white" value={projectName} onChange={(event) => setProjectName(event.target.value)} />
+              <input
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white"
+                value={projectName}
+                onChange={(event) => setProjectName(event.target.value)}
+              />
             </label>
-            <label className="space-y-2 text-sm text-slate-300">
+            <label className="space-y-2 text-sm text-text-soft">
               <span>Project key</span>
-              <input className="w-full rounded-md border border-line bg-panel-soft px-3 py-2 text-white" value={projectKey} onChange={(event) => setProjectKey(event.target.value)} placeholder="payments-api" />
+              <input
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white"
+                value={projectKey}
+                onChange={(event) => setProjectKey(event.target.value)}
+                placeholder="payments-api"
+              />
             </label>
-            <label className="space-y-2 text-sm text-slate-300">
+            <label className="space-y-2 text-sm text-text-soft">
               <span>Environment</span>
-              <select className="w-full rounded-md border border-line bg-panel-soft px-3 py-2 text-white" value={environment} onChange={(event) => setEnvironment(event.target.value)}>
+              <select
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white"
+                value={environment}
+                onChange={(event) => setEnvironment(event.target.value)}
+              >
                 <option value="development">development</option>
                 <option value="staging">staging</option>
                 <option value="production">production</option>
               </select>
             </label>
-            <label className="space-y-2 text-sm text-slate-300">
+            <label className="space-y-2 text-sm text-text-soft">
               <span>Repository URL</span>
-              <input className="w-full rounded-md border border-line bg-panel-soft px-3 py-2 text-white" value={repositoryUrl} onChange={(event) => setRepositoryUrl(event.target.value)} />
+              <input
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white"
+                value={repositoryUrl}
+                onChange={(event) => setRepositoryUrl(event.target.value)}
+              />
             </label>
-            <label className="space-y-2 text-sm text-slate-300 md:col-span-2">
+            <label className="space-y-2 text-sm text-text-soft md:col-span-2">
               <span>Owner team</span>
-              <input className="w-full rounded-md border border-line bg-panel-soft px-3 py-2 text-white" value={ownerTeam} onChange={(event) => setOwnerTeam(event.target.value)} />
+              <input
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white"
+                value={ownerTeam}
+                onChange={(event) => setOwnerTeam(event.target.value)}
+              />
             </label>
           </div>
         </section>
       ) : null}
 
       {step === 2 ? (
-        <section className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+        <section className="aegis-glass rounded-2xl p-4 shadow-panel">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h3 className="text-base font-semibold text-white">Services</h3>
             {projectType !== "monolith" ? (
@@ -461,7 +466,7 @@ AEGISOPS_ENVIRONMENT=${environment}`
                 type="button"
                 title="Add service"
                 onClick={() => setServices((current) => [...current, { name: "", serviceType: "api", language: "Generic HTTP" }])}
-                className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-sm text-white"
+                className="inline-flex h-9 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-white"
               >
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 Add
@@ -470,20 +475,41 @@ AEGISOPS_ENVIRONMENT=${environment}`
           </div>
           <div className="space-y-3">
             {services.map((service, index) => (
-              <div key={index} className="grid gap-3 rounded-lg border border-line bg-panel-soft p-3 md:grid-cols-[1fr_180px_220px_42px]">
-                <input className="rounded-md border border-line bg-panel px-3 py-2 text-sm text-white" value={service.name} onChange={(event) => updateService(index, { name: event.target.value })} placeholder="service-name" />
-                <select className="rounded-md border border-line bg-panel px-3 py-2 text-sm text-white" value={service.serviceType} onChange={(event) => updateService(index, { serviceType: event.target.value })}>
-                  {serviceTypes.map((item) => <option key={item} value={item}>{item}</option>)}
+              <div key={index} className="grid gap-3 aegis-glass rounded-2xl p-3 md:grid-cols-[1fr_180px_220px_42px]">
+                <input
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                  value={service.name}
+                  onChange={(event) => updateService(index, { name: event.target.value })}
+                  placeholder="service-name"
+                />
+                <select
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                  value={service.serviceType}
+                  onChange={(event) => updateService(index, { serviceType: event.target.value })}
+                >
+                  {serviceTypes.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </select>
-                <select className="rounded-md border border-line bg-panel px-3 py-2 text-sm text-white" value={service.language} onChange={(event) => updateService(index, { language: event.target.value })}>
-                  {languages.map((item) => <option key={item} value={item}>{item}</option>)}
+                <select
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                  value={service.language}
+                  onChange={(event) => updateService(index, { language: event.target.value })}
+                >
+                  {languages.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </select>
                 <button
                   type="button"
                   title="Remove service"
                   disabled={services.length === 1}
                   onClick={() => setServices((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                  className="grid h-10 w-10 place-items-center rounded-md border border-line text-slate-300 disabled:opacity-30"
+                  className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-text-soft disabled:opacity-30"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
@@ -494,39 +520,48 @@ AEGISOPS_ENVIRONMENT=${environment}`
       ) : null}
 
       {step === 3 ? (
-        <section className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+        <section className="aegis-glass rounded-2xl p-4 shadow-panel">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-semibold text-white">API keys</h3>
-              <p className="mt-1 text-sm text-slate-400">{project ? project.name : "Create the project before generating keys."}</p>
+              <p className="mt-1 text-sm text-text-soft">{project ? project.name : "Create the project before generating keys."}</p>
             </div>
             <button
               type="button"
               title="Generate API keys"
               onClick={generateApiKeys}
               disabled={createdServices.length === 0 || loading}
-              className="inline-flex h-10 items-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950 disabled:opacity-60"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-60"
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Clipboard className="h-4 w-4" aria-hidden="true" />}
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Clipboard className="h-4 w-4" aria-hidden="true" />
+              )}
               Generate
             </button>
           </div>
           <div className="space-y-2">
             {createdServices.map((service) => (
-              <div key={service.id} className="flex flex-col gap-2 rounded-lg border border-line bg-panel-soft p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div
+                key={service.id}
+                className="flex flex-col gap-2 aegis-glass rounded-2xl p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
                 <div>
                   <p className="font-medium text-white">{service.name}</p>
-                  <p className="text-xs text-slate-400">{service.serviceType} / {service.language ?? "Generic HTTP"}</p>
+                  <p className="text-xs text-text-soft">
+                    {service.serviceType} / {service.language ?? "Generic HTTP"}
+                  </p>
                 </div>
                 <button
                   type="button"
                   title="Copy API key"
                   disabled={!apiKeys[service.id]}
                   onClick={() => copyText(apiKeys[service.id], service.id)}
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-line px-3 text-sm text-slate-200 disabled:opacity-50"
+                  className="inline-flex h-9 items-center gap-2 rounded-full border border-white/10 px-3 text-sm text-text-primary disabled:opacity-50"
                 >
                   <Copy className="h-4 w-4" aria-hidden="true" />
-                  {apiKeys[service.id] ? copied === service.id ? "Copied" : maskKey(apiKeys[service.id]) : "Waiting"}
+                  {apiKeys[service.id] ? (copied === service.id ? "Copied" : maskKey(apiKeys[service.id])) : "Waiting"}
                 </button>
               </div>
             ))}
@@ -536,23 +571,37 @@ AEGISOPS_ENVIRONMENT=${environment}`
 
       {step === 4 ? (
         <section className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-          <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <div className="aegis-glass rounded-2xl p-4 shadow-panel">
             <h3 className="mb-3 text-base font-semibold text-white">Service</h3>
-            <select className="w-full rounded-md border border-line bg-panel-soft px-3 py-2 text-white" value={selectedServiceId} onChange={(event) => setSelectedServiceId(event.target.value)}>
-              {createdServices.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+            <select
+              className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-white"
+              value={selectedServiceId}
+              onChange={(event) => setSelectedServiceId(event.target.value)}
+            >
+              {createdServices.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
             </select>
-            <div className="mt-4 space-y-2 text-sm text-slate-300">
-              <p>Core API: <span className="text-slate-100">{coreApiUrl}</span></p>
-              <p>Gateway: <span className="text-slate-100">{gatewayUrl}</span></p>
-              <p>Project key: <span className="text-slate-100">{project?.projectKey ?? projectKey}</span></p>
+            <div className="mt-4 space-y-2 text-sm text-text-soft">
+              <p>
+                Core API: <span className="text-text-primary">{coreApiUrl}</span>
+              </p>
+              <p>
+                Gateway: <span className="text-text-primary">{gatewayUrl}</span>
+              </p>
+              <p>
+                Project key: <span className="text-text-primary">{project?.projectKey ?? projectKey}</span>
+              </p>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
                 title="Copy API key"
                 disabled={!selectedRawKey}
-                onClick={() => selectedRawKey ? copyText(selectedRawKey, "selected-api-key") : undefined}
-                className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 disabled:opacity-50"
+                onClick={() => (selectedRawKey ? copyText(selectedRawKey, "selected-api-key") : undefined)}
+                className="inline-flex h-9 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary disabled:opacity-50"
               >
                 <Copy className="h-4 w-4" aria-hidden="true" />
                 {copied === "selected-api-key" ? "Copied" : "API Key"}
@@ -562,17 +611,17 @@ AEGISOPS_ENVIRONMENT=${environment}`
                 title="Copy environment config"
                 disabled={!envSnippet}
                 onClick={() => copyText(envSnippet, "env-config")}
-                className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary disabled:opacity-50"
               >
                 <Clipboard className="h-4 w-4" aria-hidden="true" />
                 {copied === "env-config" ? "Copied" : "Env Config"}
               </button>
             </div>
           </div>
-          <div className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+          <div className="aegis-glass rounded-2xl p-4 shadow-panel">
             <div className="mb-3 flex flex-col gap-3">
               <div className="flex items-center gap-2">
-                <TerminalSquare className="h-5 w-5 text-mint" aria-hidden="true" />
+                <TerminalSquare className="h-5 w-5 text-white" aria-hidden="true" />
                 <h3 className="text-base font-semibold text-white">Framework instructions</h3>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -581,8 +630,8 @@ AEGISOPS_ENVIRONMENT=${environment}`
                     key={item}
                     type="button"
                     onClick={() => setFrameworkTab(item)}
-                    className={`h-9 rounded-md border px-3 text-xs transition ${
-                      frameworkTab === item ? "border-mint bg-mint/15 text-mint" : "border-line bg-panel-soft text-slate-300"
+                    className={`h-9 rounded-full border px-3 text-xs transition ${
+                      frameworkTab === item ? "border-white/40 bg-white/10 text-white" : "border-white/10 bg-white/5 text-text-soft"
                     }`}
                   >
                     {item}
@@ -597,7 +646,7 @@ AEGISOPS_ENVIRONMENT=${environment}`
                   title="Copy install instructions"
                   disabled={!frameworkSnippet}
                   onClick={() => copyText(frameworkSnippet, "framework-snippet")}
-                  className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 disabled:opacity-50"
+                  className="inline-flex h-9 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary disabled:opacity-50"
                 >
                   <Copy className="h-4 w-4" aria-hidden="true" />
                   {copied === "framework-snippet" ? "Copied" : "Instructions"}
@@ -605,11 +654,11 @@ AEGISOPS_ENVIRONMENT=${environment}`
               </div>
               {frameworkTab === "Node.js Express" ? (
                 <>
-                  <pre className="overflow-auto rounded-lg border border-line bg-panel-soft p-3 text-xs leading-5 text-slate-200">{envSnippet}</pre>
-                  <pre className="overflow-auto rounded-lg border border-line bg-panel-soft p-3 text-xs leading-5 text-slate-200">{nodeSnippet}</pre>
+                  <pre className="overflow-auto aegis-glass rounded-2xl p-3 text-xs leading-5 text-text-primary">{envSnippet}</pre>
+                  <pre className="overflow-auto aegis-glass rounded-2xl p-3 text-xs leading-5 text-text-primary">{nodeSnippet}</pre>
                 </>
               ) : (
-                <pre className="overflow-auto rounded-lg border border-line bg-panel-soft p-3 text-xs leading-5 text-slate-200">{frameworkSnippet}</pre>
+                <pre className="overflow-auto aegis-glass rounded-2xl p-3 text-xs leading-5 text-text-primary">{frameworkSnippet}</pre>
               )}
             </div>
           </div>
@@ -617,13 +666,21 @@ AEGISOPS_ENVIRONMENT=${environment}`
       ) : null}
 
       {step === 5 ? (
-        <section className="rounded-lg border border-line bg-panel p-4 shadow-panel">
+        <section className="aegis-glass rounded-2xl p-4 shadow-panel">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-base font-semibold text-white">Connection test</h3>
-              <p className="mt-1 text-sm text-slate-400">{selectedService ? selectedService.name : "Select a service"} / {project?.name}</p>
-              <p className="mt-1 text-xs text-slate-500">
-                {testStatus === "sending" ? "Sending test event..." : testStatus === "sent" ? "Test event accepted" : testStatus === "failed" ? "Test event failed" : "Send a test event or ingest real telemetry from your app."}
+              <p className="mt-1 text-sm text-text-soft">
+                {selectedService ? selectedService.name : "Select a service"} / {project?.name}
+              </p>
+              <p className="mt-1 text-xs text-text-muted">
+                {testStatus === "sending"
+                  ? "Sending test event..."
+                  : testStatus === "sent"
+                    ? "Test event accepted"
+                    : testStatus === "failed"
+                      ? "Test event failed"
+                      : "Send a test event or ingest real telemetry from your app."}
               </p>
             </div>
             <button
@@ -631,27 +688,27 @@ AEGISOPS_ENVIRONMENT=${environment}`
               title="Send test event"
               onClick={testSelectedService}
               disabled={!selectedService || loading}
-              className="inline-flex h-10 items-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950 disabled:opacity-60"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-60"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="h-4 w-4" aria-hidden="true" />}
               Send Test Event
             </button>
           </div>
           <div className="mb-4 grid gap-3 md:grid-cols-4">
-            <div className="rounded-lg border border-line bg-panel-soft p-3">
-              <p className="text-xs text-slate-400">Status</p>
+            <div className="aegis-glass rounded-2xl p-3">
+              <p className="text-xs text-text-soft">Status</p>
               <p className="mt-1 text-sm font-semibold text-white">{connectionStatusLabel(selectedStatus?.status)}</p>
             </div>
-            <div className="rounded-lg border border-line bg-panel-soft p-3">
-              <p className="text-xs text-slate-400">Logs 15m</p>
+            <div className="aegis-glass rounded-2xl p-3">
+              <p className="text-xs text-text-soft">Logs 15m</p>
               <p className="mt-1 text-sm font-semibold text-white">{selectedStatus?.logsLast15m ?? 0}</p>
             </div>
-            <div className="rounded-lg border border-line bg-panel-soft p-3">
-              <p className="text-xs text-slate-400">Metrics 15m</p>
+            <div className="aegis-glass rounded-2xl p-3">
+              <p className="text-xs text-text-soft">Metrics 15m</p>
               <p className="mt-1 text-sm font-semibold text-white">{selectedStatus?.metricsLast15m ?? 0}</p>
             </div>
-            <div className="rounded-lg border border-line bg-panel-soft p-3">
-              <p className="text-xs text-slate-400">P95 latency</p>
+            <div className="aegis-glass rounded-2xl p-3">
+              <p className="text-xs text-text-soft">P95 latency</p>
               <p className="mt-1 text-sm font-semibold text-white">{Math.round(selectedStatus?.p95LatencyLast15m ?? 0)} ms</p>
             </div>
           </div>
@@ -661,7 +718,7 @@ AEGISOPS_ENVIRONMENT=${environment}`
                 type="button"
                 title="Open project dashboard"
                 onClick={() => onNavigate?.("Projects")}
-                className="inline-flex h-10 items-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950"
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black"
               >
                 <ExternalLink className="h-4 w-4" aria-hidden="true" />
                 Open Project Dashboard
@@ -670,7 +727,7 @@ AEGISOPS_ENVIRONMENT=${environment}`
                 type="button"
                 title="View logs"
                 onClick={() => onNavigate?.("Logs")}
-                className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-panel-soft px-4 text-sm text-slate-200"
+                className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-text-primary"
               >
                 <FileText className="h-4 w-4" aria-hidden="true" />
                 View Logs
@@ -679,7 +736,7 @@ AEGISOPS_ENVIRONMENT=${environment}`
                 type="button"
                 title="View metrics"
                 onClick={() => onNavigate?.("Metrics")}
-                className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-panel-soft px-4 text-sm text-slate-200"
+                className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-text-primary"
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 View Metrics
@@ -690,23 +747,55 @@ AEGISOPS_ENVIRONMENT=${environment}`
             {createdServices.map((service) => {
               const status = statuses[service.id];
               return (
-                <div key={service.id} className="rounded-lg border border-line bg-panel-soft p-3">
+                <div key={service.id} className="aegis-glass rounded-2xl p-3">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-medium text-white">{service.name}</p>
-                    <span className={`inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs ${status?.connected ? "bg-mint/15 text-mint" : "bg-panel-hover text-slate-300"}`}>
+                    <span
+                      className={`inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs ${status?.connected ? "bg-white/10 text-white" : "bg-white/10 text-text-soft"}`}
+                    >
                       <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                       {connectionStatusLabel(status?.status)}
                     </span>
                   </div>
-                  <div className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-3">
-                    <p>Last log<br /><span className="text-slate-200">{status?.lastLogAt ? new Date(status.lastLogAt).toLocaleString() : "Waiting"}</span></p>
-                    <p>Last metric<br /><span className="text-slate-200">{status?.lastMetricAt ? new Date(status.lastMetricAt).toLocaleString() : "Waiting"}</span></p>
-                    <p>Heartbeat<br /><span className="text-slate-200">{status?.lastHeartbeatAt ? new Date(status.lastHeartbeatAt).toLocaleString() : "Waiting"}</span></p>
+                  <div className="mt-3 grid gap-2 text-xs text-text-soft sm:grid-cols-3">
+                    <p>
+                      Last log
+                      <br />
+                      <span className="text-text-primary">
+                        {status?.lastLogAt ? new Date(status.lastLogAt).toLocaleString() : "Waiting"}
+                      </span>
+                    </p>
+                    <p>
+                      Last metric
+                      <br />
+                      <span className="text-text-primary">
+                        {status?.lastMetricAt ? new Date(status.lastMetricAt).toLocaleString() : "Waiting"}
+                      </span>
+                    </p>
+                    <p>
+                      Heartbeat
+                      <br />
+                      <span className="text-text-primary">
+                        {status?.lastHeartbeatAt ? new Date(status.lastHeartbeatAt).toLocaleString() : "Waiting"}
+                      </span>
+                    </p>
                   </div>
-                  <div className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-3">
-                    <p>Logs health<br /><span className="text-slate-200">{status?.telemetryHealth?.logs ?? "waiting"}</span></p>
-                    <p>Metrics health<br /><span className="text-slate-200">{status?.telemetryHealth?.metrics ?? "waiting"}</span></p>
-                    <p>Error rate<br /><span className="text-slate-200">{status?.errorRateLast15m ?? 0}%</span></p>
+                  <div className="mt-3 grid gap-2 text-xs text-text-soft sm:grid-cols-3">
+                    <p>
+                      Logs health
+                      <br />
+                      <span className="text-text-primary">{status?.telemetryHealth?.logs ?? "waiting"}</span>
+                    </p>
+                    <p>
+                      Metrics health
+                      <br />
+                      <span className="text-text-primary">{status?.telemetryHealth?.metrics ?? "waiting"}</span>
+                    </p>
+                    <p>
+                      Error rate
+                      <br />
+                      <span className="text-text-primary">{status?.errorRateLast15m ?? 0}%</span>
+                    </p>
                   </div>
                 </div>
               );
@@ -715,34 +804,65 @@ AEGISOPS_ENVIRONMENT=${environment}`
         </section>
       ) : null}
 
-      <div className="flex flex-wrap justify-between gap-3 border-t border-line pt-4">
+      <div className="flex flex-wrap justify-between gap-3 border-t border-white/10 pt-4">
         <button
           type="button"
           title="Previous step"
           onClick={() => setStep((current) => Math.max(0, current - 1))}
-          className="h-10 rounded-md border border-line bg-panel-soft px-4 text-sm text-slate-200"
+          className="h-10 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-text-primary"
         >
           Back
         </button>
         {step < 2 ? (
-          <button type="button" title="Next step" onClick={() => setStep((current) => current + 1)} className="inline-flex h-10 items-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950">
+          <button
+            type="button"
+            title="Next step"
+            onClick={() => setStep((current) => current + 1)}
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black"
+          >
             Next <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
         ) : step === 2 ? (
-          <button type="button" title="Create project" onClick={createProjectAndServices} disabled={!canCreate || loading} className="inline-flex h-10 items-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950 disabled:opacity-60">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+          <button
+            type="button"
+            title="Create project"
+            onClick={createProjectAndServices}
+            disabled={!canCreate || loading}
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-60"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            )}
             Create Project
           </button>
         ) : step === 3 ? (
-          <button type="button" title="Install step" onClick={() => setStep(4)} disabled={Object.keys(apiKeys).length === 0} className="inline-flex h-10 items-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950 disabled:opacity-60">
+          <button
+            type="button"
+            title="Install step"
+            onClick={() => setStep(4)}
+            disabled={Object.keys(apiKeys).length === 0}
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-60"
+          >
             Install <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
         ) : step === 4 ? (
-          <button type="button" title="Test step" onClick={() => setStep(5)} className="inline-flex h-10 items-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950">
+          <button
+            type="button"
+            title="Test step"
+            onClick={() => setStep(5)}
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black"
+          >
             Test <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
         ) : (
-          <button type="button" title="Refresh status" onClick={refreshStatuses} className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-panel-soft px-4 text-sm text-slate-200">
+          <button
+            type="button"
+            title="Refresh status"
+            onClick={refreshStatuses}
+            className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-text-primary"
+          >
             Refresh Status
           </button>
         )}

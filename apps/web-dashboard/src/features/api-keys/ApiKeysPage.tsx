@@ -26,15 +26,15 @@ const compactId = (value?: string) => (value ? `${value.slice(0, 8)}...${value.s
 const maskedKey = (apiKey: ApiKeyRecord) => `${apiKey.prefix}...${apiKey.status === "active" ? "active" : "revoked"}`;
 
 const statusClass = (status: string) => {
-  if (status === "active") return "border-mint/30 bg-mint/10 text-mint";
+  if (status === "active") return "border-white/20 bg-white/10 text-white";
   if (status === "revoked") return "border-rose-500/30 bg-rose-500/10 text-rose-300";
-  return "border-line bg-panel-soft text-slate-300";
+  return "border-white/10 bg-white/5 text-text-soft";
 };
 
 const connectionClass = (status?: string) => {
-  if (status === "connected") return "border-mint/30 bg-mint/10 text-mint";
+  if (status === "connected") return "border-white/20 bg-white/10 text-white";
   if (status === "erroring" || status === "stale") return "border-amber-500/30 bg-amber-500/10 text-amber-300";
-  return "border-line bg-panel-soft text-slate-300";
+  return "border-white/10 bg-white/5 text-text-soft";
 };
 
 export function ApiKeysPage() {
@@ -171,22 +171,22 @@ export function ApiKeysPage() {
   return (
     <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
       <aside className="space-y-4">
-        <form onSubmit={submit} className="rounded-lg border border-line bg-panel p-5 shadow-panel">
+        <form onSubmit={submit} className="aegis-glass rounded-2xl p-5 shadow-panel">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-white">API Keys</h2>
-              <p className="text-xs text-slate-400">Ingestion credentials</p>
+              <p className="text-xs text-text-soft">Ingestion credentials</p>
             </div>
-            <KeyRound className="h-5 w-5 text-mint" />
+            <KeyRound className="h-5 w-5 text-white" />
           </div>
 
           <div className="grid gap-3">
-            <label className="text-xs font-semibold uppercase text-slate-400">
+            <label className="text-xs font-semibold uppercase text-text-soft">
               Organization
               <select
                 value={organizationId}
                 onChange={(event) => handleScopeChange(event.target.value)}
-                className="mt-1 h-10 w-full rounded-md border border-line bg-panel-soft px-3 text-sm normal-case text-white"
+                className="mt-1 h-10 w-full rounded-2xl border border-white/10 bg-white/5 px-3 text-sm normal-case text-white"
               >
                 {organizations.map((organization) => (
                   <option key={organization.id} value={organization.id}>
@@ -195,12 +195,12 @@ export function ApiKeysPage() {
                 ))}
               </select>
             </label>
-            <label className="text-xs font-semibold uppercase text-slate-400">
+            <label className="text-xs font-semibold uppercase text-text-soft">
               Service Scope
               <select
                 value={serviceId}
                 onChange={(event) => handleScopeChange(organizationId, event.target.value)}
-                className="mt-1 h-10 w-full rounded-md border border-line bg-panel-soft px-3 text-sm normal-case text-white"
+                className="mt-1 h-10 w-full rounded-2xl border border-white/10 bg-white/5 px-3 text-sm normal-case text-white"
               >
                 <option value="">Organization-wide</option>
                 {filteredServices.map((service) => (
@@ -210,29 +210,29 @@ export function ApiKeysPage() {
                 ))}
               </select>
             </label>
-            <label className="text-xs font-semibold uppercase text-slate-400">
+            <label className="text-xs font-semibold uppercase text-text-soft">
               Key Name
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="mt-1 h-10 w-full rounded-md border border-line bg-panel-soft px-3 text-sm normal-case text-white"
+                className="mt-1 h-10 w-full rounded-2xl border border-white/10 bg-white/5 px-3 text-sm normal-case text-white"
                 placeholder="production ingestion key"
               />
             </label>
             <button
               type="submit"
               disabled={!organizationId || !name.trim() || loading}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-black disabled:opacity-50"
             >
               <KeyRound className="h-4 w-4" />
               Create Key
             </button>
           </div>
-          {status ? <p className="mt-3 text-sm text-slate-300">{status}</p> : null}
+          {status ? <p className="mt-3 text-sm text-text-soft">{status}</p> : null}
         </form>
 
         {revealedKey ? (
-          <section className="rounded-lg border border-amber-500/30 bg-amber/10 p-5 shadow-panel">
+          <section className="rounded-2xl border border-amber-500/30 bg-amber/10 p-5 shadow-panel">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase text-amber-300">{revealedKey.action} key</p>
@@ -242,46 +242,46 @@ export function ApiKeysPage() {
                 type="button"
                 title="Copy raw API key"
                 onClick={() => copyRawKey(revealedKey.apiKey.rawKey)}
-                className="grid h-9 w-9 place-items-center rounded-md border border-amber-500/30 bg-panel-soft text-amber-200 hover:text-white"
+                className="grid h-9 w-9 place-items-center rounded-full border border-amber-500/30 bg-white/5 text-amber-200 hover:text-white"
               >
                 <Copy className="h-4 w-4" />
               </button>
             </div>
-            <code className="mt-4 block overflow-x-auto rounded-md border border-line bg-panel-soft p-3 text-xs text-slate-200">
+            <code className="mt-4 block overflow-x-auto rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-text-primary">
               {revealedKey.apiKey.rawKey}
             </code>
-            <p className="mt-2 text-xs text-slate-400">{copied ? "Copied" : "Prefix " + revealedKey.apiKey.prefix}</p>
+            <p className="mt-2 text-xs text-text-soft">{copied ? "Copied" : "Prefix " + revealedKey.apiKey.prefix}</p>
           </section>
         ) : null}
 
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-lg border border-line bg-panel p-3 shadow-panel">
-            <p className="text-xs uppercase text-slate-400">Active</p>
-            <p className="mt-1 text-xl font-bold text-mint">{activeCount}</p>
+          <div className="aegis-glass rounded-2xl p-3 shadow-panel">
+            <p className="text-xs uppercase text-text-soft">Active</p>
+            <p className="mt-1 text-xl font-bold text-white">{activeCount}</p>
           </div>
-          <div className="rounded-lg border border-line bg-panel p-3 shadow-panel">
-            <p className="text-xs uppercase text-slate-400">Used</p>
+          <div className="aegis-glass rounded-2xl p-3 shadow-panel">
+            <p className="text-xs uppercase text-text-soft">Used</p>
             <p className="mt-1 text-xl font-bold text-white">{usedCount}</p>
           </div>
-          <div className="rounded-lg border border-line bg-panel p-3 shadow-panel">
-            <p className="text-xs uppercase text-slate-400">Revoked</p>
+          <div className="aegis-glass rounded-2xl p-3 shadow-panel">
+            <p className="text-xs uppercase text-text-soft">Revoked</p>
             <p className="mt-1 text-xl font-bold text-rose-300">{revokedCount}</p>
           </div>
         </div>
       </aside>
 
-      <main className="rounded-lg border border-line bg-panel p-5 shadow-panel">
+      <main className="aegis-glass rounded-2xl p-5 shadow-panel">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-white">Key Registry</h3>
-            <p className="text-xs text-slate-400">{organizationId ? compactId(organizationId) : "No organization selected"}</p>
+            <p className="text-xs text-text-soft">{organizationId ? compactId(organizationId) : "No organization selected"}</p>
           </div>
           <button
             type="button"
             onClick={() => loadKeys()}
             disabled={loading}
             title="Refresh API keys"
-            className="grid h-9 w-9 place-items-center rounded-md border border-line bg-panel-soft text-slate-300 hover:text-white disabled:opacity-50"
+            className="grid h-9 w-9 place-items-center rounded-2xl border border-white/10 bg-white/5 text-text-soft hover:text-white disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -290,7 +290,7 @@ export function ApiKeysPage() {
         {apiKeys.length === 0 ? <EmptyState title="No API keys found" /> : null}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-line text-xs uppercase text-slate-400">
+            <thead className="border-b border-white/10 text-xs uppercase text-text-soft">
               <tr>
                 <th className="py-3 pr-4">Name</th>
                 <th className="py-3 pr-4">Key</th>
@@ -308,23 +308,27 @@ export function ApiKeysPage() {
                   <tr key={apiKey.id}>
                     <td className="py-3 pr-4">
                       <div className="font-medium text-white">{apiKey.name}</div>
-                      <div className="text-xs text-slate-500">Created {formatDate(apiKey.createdAt)}</div>
+                      <div className="text-xs text-text-muted">Created {formatDate(apiKey.createdAt)}</div>
                     </td>
                     <td className="py-3 pr-4">
-                      <code className="rounded-md border border-line bg-panel-soft px-2 py-1 text-xs text-slate-300">{maskedKey(apiKey)}</code>
+                      <code className="rounded-2xl border border-white/10 bg-white/5 px-2 py-1 text-xs text-text-soft">
+                        {maskedKey(apiKey)}
+                      </code>
                     </td>
-                    <td className="py-3 pr-4 text-slate-300">
+                    <td className="py-3 pr-4 text-text-soft">
                       <div>{service?.name ?? "organization-wide"}</div>
-                      <div className="font-mono text-xs text-slate-500">{compactId(apiKey.serviceId)}</div>
+                      <div className="font-mono text-xs text-text-muted">{compactId(apiKey.serviceId)}</div>
                     </td>
-                    <td className="py-3 pr-4 text-xs text-slate-400">{formatDate(apiKey.lastUsedAt)}</td>
+                    <td className="py-3 pr-4 text-xs text-text-soft">{formatDate(apiKey.lastUsedAt)}</td>
                     <td className="py-3 pr-4">
                       <div className="flex flex-col gap-2">
-                        <span className={`w-fit rounded-md border px-2 py-1 text-xs font-semibold ${statusClass(apiKey.status)}`}>
+                        <span className={`w-fit rounded-full border px-2 py-1 text-xs font-semibold ${statusClass(apiKey.status)}`}>
                           {apiKey.status}
                         </span>
                         {apiKey.serviceId ? (
-                          <span className={`inline-flex w-fit items-center gap-1 rounded-md border px-2 py-1 text-xs ${connectionClass(connection?.status)}`}>
+                          <span
+                            className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-1 text-xs ${connectionClass(connection?.status)}`}
+                          >
                             <ShieldCheck className="h-3.5 w-3.5" />
                             {connection?.status ?? "checking"}
                           </span>
@@ -338,7 +342,7 @@ export function ApiKeysPage() {
                           title="Rotate API key"
                           onClick={() => rotate(apiKey)}
                           disabled={apiKey.status !== "active" || loading}
-                          className="grid h-9 w-9 place-items-center rounded-md border border-line bg-panel-soft text-slate-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                          className="grid h-9 w-9 place-items-center rounded-2xl border border-white/10 bg-white/5 text-text-soft hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <RotateCw className="h-4 w-4" />
                         </button>
@@ -347,7 +351,7 @@ export function ApiKeysPage() {
                           title="Revoke API key"
                           onClick={() => revoke(apiKey)}
                           disabled={apiKey.status !== "active" || loading}
-                          className="grid h-9 w-9 place-items-center rounded-md border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                          className="grid h-9 w-9 place-items-center rounded-full border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

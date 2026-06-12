@@ -61,24 +61,38 @@ export function SLOsPage() {
     load();
   }, [environment, fromIso]);
 
-  const rows = useMemo<SloRow[]>(() => services.map((service) => {
-    const serviceLogs = logs.filter((log) => log.serviceId === service.id || log.serviceName === service.name);
-    const errorLogs = serviceLogs.filter((log) => numberValue(log.statusCode) >= 500 || ["error", "fatal"].includes(String(log.level).toLowerCase())).length;
-    const serviceAggregates = aggregates.filter((item) => item.serviceId === service.id || item.serviceName === service.name);
-    const p95Latency = Math.max(0, ...serviceAggregates.map((item) => numberValue(item.p95)));
-    const totalLogs = serviceLogs.length;
-    const observedAvailability = totalLogs ? Math.max(0, (1 - errorLogs / totalLogs) * 100) : service.healthStatus === "healthy" ? 100 : service.healthStatus === "degraded" ? 99 : 0;
-    const openIncidents = incidents.filter((incident) => incident.serviceId === service.id && !["resolved", "closed"].includes(incident.status)).length;
-    return {
-      service,
-      availability: observedAvailability,
-      errorBudgetUsed: Math.min(100, Math.max(0, ((100 - observedAvailability) / 0.1) * 100)),
-      p95Latency,
-      errorLogs,
-      totalLogs,
-      openIncidents
-    };
-  }), [aggregates, incidents, logs, services]);
+  const rows = useMemo<SloRow[]>(
+    () =>
+      services.map((service) => {
+        const serviceLogs = logs.filter((log) => log.serviceId === service.id || log.serviceName === service.name);
+        const errorLogs = serviceLogs.filter(
+          (log) => numberValue(log.statusCode) >= 500 || ["error", "fatal"].includes(String(log.level).toLowerCase())
+        ).length;
+        const serviceAggregates = aggregates.filter((item) => item.serviceId === service.id || item.serviceName === service.name);
+        const p95Latency = Math.max(0, ...serviceAggregates.map((item) => numberValue(item.p95)));
+        const totalLogs = serviceLogs.length;
+        const observedAvailability = totalLogs
+          ? Math.max(0, (1 - errorLogs / totalLogs) * 100)
+          : service.healthStatus === "healthy"
+            ? 100
+            : service.healthStatus === "degraded"
+              ? 99
+              : 0;
+        const openIncidents = incidents.filter(
+          (incident) => incident.serviceId === service.id && !["resolved", "closed"].includes(incident.status)
+        ).length;
+        return {
+          service,
+          availability: observedAvailability,
+          errorBudgetUsed: Math.min(100, Math.max(0, ((100 - observedAvailability) / 0.1) * 100)),
+          p95Latency,
+          errorLogs,
+          totalLogs,
+          openIncidents
+        };
+      }),
+    [aggregates, incidents, logs, services]
+  );
 
   const availabilityBreaches = rows.filter((row) => row.availability < 99.9).length;
   const latencyBreaches = rows.filter((row) => row.p95Latency > 500).length;
@@ -89,31 +103,53 @@ export function SLOsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">SLOs</h2>
-          <p className="mt-1 text-sm text-slate-400">Service-level objective tracking from logs, metric aggregates, and incident state.</p>
+          <p className="mt-1 text-sm text-text-soft">Service-level objective tracking from logs, metric aggregates, and incident state.</p>
         </div>
         <Button icon={<RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />} disabled={loading} onClick={load}>
           Refresh
         </Button>
       </div>
-      {error ? <div className="rounded-lg border border-rose/40 bg-rose/10 p-3 text-sm text-rose">{error}</div> : null}
+      {error ? <div className="rounded-2xl border border-rose/40 bg-rose/10 p-3 text-sm text-rose">{error}</div> : null}
 
       <div className="grid gap-3 md:grid-cols-4">
-        <StatCard label="Avg availability" value={rows.length ? pct(averageAvailability) : "0%"} detail={`target 99.90% in ${environment}`} />
+        <StatCard
+          label="Avg availability"
+          value={rows.length ? pct(averageAvailability) : "0%"}
+          detail={`target 99.90% in ${environment}`}
+        />
         <StatCard label="Availability breaches" value={availabilityBreaches} detail="services below target" />
         <StatCard label="Latency breaches" value={latencyBreaches} detail="p95 above 500ms" />
         <StatCard label="Open incidents" value={rows.reduce((sum, row) => sum + row.openIncidents, 0)} detail="service scoped" />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-3">
-        <ObjectiveCard icon={<Target className="h-5 w-5 text-mint" />} title="Availability" target="99.90%" value={pct(averageAvailability)} breached={availabilityBreaches > 0} />
-        <ObjectiveCard icon={<CheckCircle2 className="h-5 w-5 text-amber" />} title="Latency" target="p95 under 500ms" value={`${latencyBreaches} breach${latencyBreaches === 1 ? "" : "es"}`} breached={latencyBreaches > 0} />
-        <ObjectiveCard icon={<ShieldAlert className="h-5 w-5 text-rose" />} title="Error Budget" target="0.10% monthly" value={`${rows.filter((row) => row.errorBudgetUsed >= 100).length} exhausted`} breached={rows.some((row) => row.errorBudgetUsed >= 100)} />
+        <ObjectiveCard
+          icon={<Target className="h-5 w-5 text-white" />}
+          title="Availability"
+          target="99.90%"
+          value={pct(averageAvailability)}
+          breached={availabilityBreaches > 0}
+        />
+        <ObjectiveCard
+          icon={<CheckCircle2 className="h-5 w-5 text-amber" />}
+          title="Latency"
+          target="p95 under 500ms"
+          value={`${latencyBreaches} breach${latencyBreaches === 1 ? "" : "es"}`}
+          breached={latencyBreaches > 0}
+        />
+        <ObjectiveCard
+          icon={<ShieldAlert className="h-5 w-5 text-rose" />}
+          title="Error Budget"
+          target="0.10% monthly"
+          value={`${rows.filter((row) => row.errorBudgetUsed >= 100).length} exhausted`}
+          breached={rows.some((row) => row.errorBudgetUsed >= 100)}
+        />
       </div>
 
       <Card title="Service Objectives" description={`Observed since ${new Date(fromIso).toLocaleString()}`}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-line text-xs uppercase text-slate-500">
+            <thead className="border-b border-white/10 text-xs uppercase text-text-muted">
               <tr>
                 <th className="py-3 pr-4">Service</th>
                 <th className="py-3 pr-4">Health</th>
@@ -128,37 +164,53 @@ export function SLOsPage() {
               {rows.map((row) => (
                 <tr key={row.service.id}>
                   <td className="py-3 pr-4 font-medium text-white">{row.service.name}</td>
-                  <td className="py-3 pr-4"><StatusBadge status={row.service.healthStatus} /></td>
-                  <td className="py-3 pr-4 text-slate-200">{pct(row.availability)}</td>
-                  <td className="py-3 pr-4 text-slate-300">{pct(row.errorBudgetUsed)}</td>
-                  <td className="py-3 pr-4 text-slate-300">{Math.round(row.p95Latency)}ms</td>
-                  <td className="py-3 pr-4 text-slate-300">{row.errorLogs}/{row.totalLogs}</td>
-                  <td className="py-3">
-                    {row.openIncidents > 0 ? <SeverityBadge severity="high" /> : <StatusBadge status="healthy" />}
+                  <td className="py-3 pr-4">
+                    <StatusBadge status={row.service.healthStatus} />
                   </td>
+                  <td className="py-3 pr-4 text-text-primary">{pct(row.availability)}</td>
+                  <td className="py-3 pr-4 text-text-soft">{pct(row.errorBudgetUsed)}</td>
+                  <td className="py-3 pr-4 text-text-soft">{Math.round(row.p95Latency)}ms</td>
+                  <td className="py-3 pr-4 text-text-soft">
+                    {row.errorLogs}/{row.totalLogs}
+                  </td>
+                  <td className="py-3">{row.openIncidents > 0 ? <SeverityBadge severity="high" /> : <StatusBadge status="healthy" />}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {rows.length === 0 ? <p className="py-8 text-sm text-slate-500">No services found for the selected environment.</p> : null}
+          {rows.length === 0 ? <p className="py-8 text-sm text-text-muted">No services found for the selected environment.</p> : null}
         </div>
       </Card>
     </div>
   );
 }
 
-function ObjectiveCard({ icon, title, target, value, breached }: { icon: React.ReactNode; title: string; target: string; value: string; breached: boolean }) {
+function ObjectiveCard({
+  icon,
+  title,
+  target,
+  value,
+  breached
+}: {
+  icon: React.ReactNode;
+  title: string;
+  target: string;
+  value: string;
+  breached: boolean;
+}) {
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-white">{title}</p>
-          <p className="mt-1 text-xs text-slate-500">Target: {target}</p>
+          <p className="mt-1 text-xs text-text-muted">Target: {target}</p>
           <p className="mt-4 text-2xl font-semibold text-white">{value}</p>
         </div>
         {icon}
       </div>
-      <div className={`mt-4 rounded-md border px-3 py-2 text-xs font-semibold ${breached ? "border-rose/40 bg-rose/10 text-rose" : "border-success/40 bg-success/10 text-success"}`}>
+      <div
+        className={`mt-4 rounded-full border px-3 py-2 text-xs font-semibold ${breached ? "border-rose/40 bg-rose/10 text-rose" : "border-success/40 bg-success/10 text-success"}`}
+      >
         {breached ? "Needs attention" : "Within objective"}
       </div>
     </Card>

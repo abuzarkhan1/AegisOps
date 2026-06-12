@@ -1,41 +1,44 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { RadioTower, ShieldCheck } from "lucide-react";
 import { AuthPage } from "./AuthPage";
 import { useAuth } from "./auth";
 import { coreApiUrl, gatewayUrl } from "./config";
 import { navByPath, navigationItems, navPath } from "./navigation";
-import { RouteView } from "./router";
+import { OnboardingRouteView, PublicRouteView, publicRouteDefinitions, RouteView } from "./router";
 import { WorkspaceProvider } from "./workspace";
-import { AppShell } from "../shared/layout/AppShell";
 import { fetchHealthTarget } from "../shared/api/health";
 import type { HealthResult, HealthState } from "../shared/api/health";
+import { DashboardLayout } from "../shared/layout/DashboardLayout";
+import { OnboardingLayout } from "../shared/layout/OnboardingLayout";
+import { PublicLayout } from "../shared/layout/PublicLayout";
 
 const healthTargets = [
   { name: "Gateway", url: `${gatewayUrl}/health`, icon: ShieldCheck },
   { name: "Core API", url: `${coreApiUrl}/health`, icon: RadioTower }
 ];
 
-const labelFromLocation = () => navByPath[window.location.pathname] ?? "Overview";
+const labelFromPath = (path: string) => navByPath[path] ?? "Overview";
+const publicPaths = new Set(publicRouteDefinitions.map((route) => route.path));
+const authPublicPaths = new Set(["/login", "/register"]);
 
 function App() {
   const auth = useAuth();
-  const [activeNav, setActiveNav] = useState(labelFromLocation);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const path = location.pathname;
+  const activeNav = labelFromPath(path);
   const [health, setHealth] = useState<Record<string, HealthResult>>({});
 
-  const handleNavChange = (label: string) => {
-    const item = navigationItems.find((navItem) => navItem.label === label);
-    const path = navPath(label, item?.path);
-    setActiveNav(label);
-    if (window.location.pathname !== path) {
-      window.history.pushState(null, "", path);
-    }
-  };
+  const navigatePath = useCallback((nextPath: string, replace = false) => navigate(nextPath, { replace }), [navigate]);
 
-  useEffect(() => {
-    const onPopState = () => setActiveNav(labelFromLocation());
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+  const handleNavChange = useCallback(
+    (label: string) => {
+      const item = navigationItems.find((navItem) => navItem.label === label);
+      navigatePath(navPath(label, item?.path));
+    },
+    [navigatePath]
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -55,29 +58,63 @@ function App() {
     };
   }, []);
 
-  const healthyCount = useMemo(
-    () => Object.values(health).filter((item) => item.status === "ok").length,
-    [health]
-  );
+  const healthyCount = useMemo(() => Object.values(health).filter((item) => item.status === "ok").length, [health]);
   const shellStatus: HealthState = healthyCount === healthTargets.length ? "ok" : "degraded";
+
+  const isPublicPath = publicPaths.has(path);
+  const isOnboardingPath = path === "/onboarding";
+
+  useEffect(() => {
+    const pageName = isOnboardingPath
+      ? "Onboarding"
+      : isPublicPath
+        ? publicRouteDefinitions.find((route) => route.path === path)?.path.replace("/", "")
+        : activeNav;
+    const title = pageName ? `${pageName === "" ? "Home" : pageName.replace(/-/g, " ")} | AegisOps` : "AegisOps";
+    document.title = title.replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }, [activeNav, isOnboardingPath, isPublicPath, path]);
+
+  const onAuthenticated = (mode: "login" | "register") => {
+    navigatePath(mode === "register" ? "/onboarding" : "/overview");
+  };
+
+  if (isPublicPath) {
+    if (authPublicPaths.has(path)) {
+      return <PublicRouteView path={path} onAuthenticated={onAuthenticated} />;
+    }
+
+    return (
+      <PublicLayout activePath={path}>
+        <PublicRouteView path={path} onAuthenticated={onAuthenticated} />
+      </PublicLayout>
+    );
+  }
 
   if (auth.status === "loading") {
     return (
-      <div className="grid min-h-screen place-items-center bg-shell text-slate-100">
-        <div className="rounded-lg border border-line bg-panel p-5 text-sm text-slate-300 shadow-panel">Loading secure workspace</div>
+      <div className="grid min-h-screen place-items-center bg-shell text-text-primary">
+        <div className="aegis-glass rounded-2xl p-5 text-sm text-text-soft shadow-panel">Loading secure workspace</div>
       </div>
     );
   }
 
   if (auth.status === "anonymous") {
-    return <AuthPage />;
+    return <AuthPage initialMode={isOnboardingPath ? "register" : "login"} onAuthenticated={onAuthenticated} />;
+  }
+
+  if (isOnboardingPath) {
+    return (
+      <OnboardingLayout>
+        <OnboardingRouteView onNavigate={handleNavChange} />
+      </OnboardingLayout>
+    );
   }
 
   return (
     <WorkspaceProvider>
-      <AppShell activeNav={activeNav} onNavChange={handleNavChange} status={shellStatus}>
+      <DashboardLayout activeNav={activeNav} onNavChange={handleNavChange} status={shellStatus}>
         <RouteView activeNav={activeNav} health={health} onNavigate={handleNavChange} />
-      </AppShell>
+      </DashboardLayout>
     </WorkspaceProvider>
   );
 }

@@ -160,7 +160,7 @@ export function NotificationsPage() {
   }
 
   function togglePolicyProvider(value: Provider) {
-    setPolicyProviders((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
+    setPolicyProviders((current) => (current.includes(value) ? current.filter((item) => item !== value) : [...current, value]));
   }
 
   return (
@@ -168,14 +168,14 @@ export function NotificationsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Notifications</h2>
-          <p className="mt-1 text-sm text-slate-400">Workspace notification routes, escalation policies, and delivery history.</p>
+          <p className="mt-1 text-sm text-text-soft">Workspace notification routes, escalation policies, and delivery history.</p>
         </div>
         <Button icon={<RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />} disabled={loading} onClick={loadWorkspace}>
           Refresh
         </Button>
       </div>
 
-      {status ? <div className="rounded-lg border border-line bg-panel-soft p-3 text-sm text-slate-300">{status}</div> : null}
+      {status ? <div className="aegis-glass rounded-2xl p-3 text-sm text-text-soft">{status}</div> : null}
 
       <div className="grid gap-3 md:grid-cols-4">
         <StatCard label="Organizations" value={organizations.length} detail={activeOrg?.name ?? "none selected"} />
@@ -190,15 +190,23 @@ export function NotificationsPage() {
             <Card
               title="Provider Route"
               description="Save a real workspace destination and send a provider test event."
-              action={<BellRing className="h-5 w-5 text-mint" aria-hidden="true" />}
+              action={<BellRing className="h-5 w-5 text-white" aria-hidden="true" />}
             >
               <div className="grid gap-3">
                 <Select value={organizationId} onChange={(event) => setOrganizationId(event.target.value)} aria-label="Organization">
                   <option value="">Select organization</option>
-                  {organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
+                  {organizations.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
                 </Select>
                 <Select value={provider} onChange={(event) => setProvider(event.target.value as Provider)} aria-label="Provider">
-                  {providerOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                  {providerOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </Select>
                 <Input
                   value={destination}
@@ -224,7 +232,11 @@ export function NotificationsPage() {
               <div className="grid gap-3">
                 <Input value={policyName} onChange={(event) => setPolicyName(event.target.value)} aria-label="Policy name" />
                 <Select value={policySeverity} onChange={(event) => setPolicySeverity(event.target.value)} aria-label="Policy severity">
-                  {severityOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                  {severityOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </Select>
                 <div className="flex flex-wrap gap-2">
                   {providerOptions.map((item) => (
@@ -232,13 +244,17 @@ export function NotificationsPage() {
                       key={item}
                       type="button"
                       onClick={() => togglePolicyProvider(item)}
-                      className={`h-9 rounded-md border px-3 text-xs font-semibold ${policyProviders.includes(item) ? "border-mint bg-mint/10 text-mint" : "border-line bg-panel-soft text-slate-400 hover:text-white"}`}
+                      className={`h-9 rounded-full border px-3 text-xs font-semibold ${policyProviders.includes(item) ? "border-white/40 bg-white/10 text-white" : "border-white/10 bg-white/5 text-text-soft hover:text-white"}`}
                     >
                       {item}
                     </button>
                   ))}
                 </div>
-                <Button type="submit" disabled={loading || !organizationId || policyProviders.length === 0} icon={<Save className="h-4 w-4" />}>
+                <Button
+                  type="submit"
+                  disabled={loading || !organizationId || policyProviders.length === 0}
+                  icon={<Save className="h-4 w-4" />}
+                >
                   Save Policy
                 </Button>
               </div>
@@ -250,46 +266,52 @@ export function NotificationsPage() {
           <Card title="Configured Routes" description="Enabled destinations returned by the notification service.">
             <div className="grid gap-3">
               {settings.map((setting) => (
-                <div key={`${setting.organizationId}-${setting.provider}-${setting.destination}`} className="rounded-lg border border-line bg-panel-soft p-3">
+                <div key={`${setting.organizationId}-${setting.provider}-${setting.destination}`} className="aegis-glass rounded-2xl p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-white">{setting.provider}</p>
                     <StatusBadge status={setting.enabled ? "active" : "disabled"} />
                   </div>
-                  <p className="mt-2 break-all text-sm text-slate-400">{setting.destination}</p>
+                  <p className="mt-2 break-all text-sm text-text-soft">{setting.destination}</p>
                 </div>
               ))}
-              {settings.length === 0 ? <p className="text-sm text-slate-500">No notification routes saved for this organization.</p> : null}
+              {settings.length === 0 ? (
+                <p className="text-sm text-text-muted">No notification routes saved for this organization.</p>
+              ) : null}
             </div>
           </Card>
 
           <Card title="Escalation Policies" description="Incident escalation paths for the selected organization.">
             <div className="grid gap-3">
               {policies.map((policy) => (
-                <div key={`${policy.organizationId}-${policy.name}`} className="rounded-lg border border-line bg-panel-soft p-3">
+                <div key={`${policy.organizationId}-${policy.name}`} className="aegis-glass rounded-2xl p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-white">{policy.name}</p>
                     <Badge tone={policy.enabled ? "success" : "muted"}>{policy.severity}</Badge>
                   </div>
-                  <p className="mt-2 text-sm text-slate-400">{policy.providers.join(", ")}</p>
+                  <p className="mt-2 text-sm text-text-soft">{policy.providers.join(", ")}</p>
                 </div>
               ))}
-              {policies.length === 0 ? <p className="text-sm text-slate-500">No escalation policies saved yet.</p> : null}
+              {policies.length === 0 ? <p className="text-sm text-text-muted">No escalation policies saved yet.</p> : null}
             </div>
           </Card>
 
           <Card title="Notification History" description="Accepted provider jobs for the selected organization.">
             <div className="grid gap-3">
               {history.map((entry) => (
-                <div key={entry.id} className="rounded-lg border border-line bg-panel-soft p-3">
+                <div key={entry.id} className="aegis-glass rounded-2xl p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-white">{entry.subject}</p>
                     <StatusBadge status={entry.status.toLowerCase()} />
                   </div>
-                  <p className="mt-2 break-all text-sm text-slate-400">{entry.provider} to {entry.destination}</p>
-                  <p className="mt-1 text-xs text-slate-500">{new Date(entry.createdAt).toLocaleString()}</p>
+                  <p className="mt-2 break-all text-sm text-text-soft">
+                    {entry.provider} to {entry.destination}
+                  </p>
+                  <p className="mt-1 text-xs text-text-muted">{new Date(entry.createdAt).toLocaleString()}</p>
                 </div>
               ))}
-              {history.length === 0 ? <p className="text-sm text-slate-500">No provider jobs have been accepted for this organization.</p> : null}
+              {history.length === 0 ? (
+                <p className="text-sm text-text-muted">No provider jobs have been accepted for this organization.</p>
+              ) : null}
             </div>
           </Card>
         </div>

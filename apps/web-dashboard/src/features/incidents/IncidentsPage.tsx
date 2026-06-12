@@ -11,8 +11,7 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
-  ShieldCheck,
-  Siren
+  ShieldCheck
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
@@ -32,22 +31,23 @@ import {
   saveIncidentAnalysis
 } from "../../shared/api/core";
 import type { IncidentAnalysisRecord, IncidentEvidenceRecord, IncidentRecord } from "../../shared/api/core";
+import { Button } from "../../shared/ui/Button";
 import { EmptyState } from "../../shared/ui/EmptyState";
 
 const severityClass: Record<string, string> = {
   critical: "border-rose-500/40 bg-rose-500/10 text-rose-400",
   high: "border-amber-500/40 bg-amber-500/10 text-amber-400",
-  medium: "border-mint/40 bg-mint/10 text-mint",
-  low: "border-mint/40 bg-mint/10 text-mint"
+  medium: "border-white/25 bg-white/10 text-white",
+  low: "border-white/25 bg-white/10 text-white"
 };
 
 const statusColors: Record<string, string> = {
   open: "text-rose-400",
   investigating: "text-amber-400",
-  identified: "text-mint",
+  identified: "text-white",
   monitoring: "text-indigo-400",
-  resolved: "text-mint",
-  closed: "text-slate-400"
+  resolved: "text-white",
+  closed: "text-text-soft"
 };
 
 const evidenceTabs = ["all", "log", "metric", "deployment", "route", "related_incident"];
@@ -72,7 +72,7 @@ const jsonPreview = (value: Record<string, unknown>) => {
   return text.length > 500 ? `${text.slice(0, 500)}...` : text;
 };
 
-export function IncidentsPage() {
+export function IncidentsPage({ onNavigate }: { onNavigate?: (label: string) => void }) {
   const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
   const [selectedIncident, setSelectedIncident] = useState<IncidentRecord | null>(null);
   const [timeline, setTimeline] = useState<any[]>([]);
@@ -238,18 +238,18 @@ export function IncidentsPage() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-      <div className="flex h-[780px] flex-col rounded-lg border border-line bg-panel p-5 shadow-panel">
+      <div className="flex h-[780px] flex-col aegis-glass rounded-2xl p-5 shadow-panel">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-white">Incidents</h2>
-            <p className="text-xs text-slate-400">Lifecycle, evidence, RCA, and postmortems</p>
+            <p className="text-xs text-text-soft">Lifecycle, evidence, RCA, and postmortems</p>
           </div>
           <button
             type="button"
             title="Refresh incidents"
             onClick={() => loadIncidents()}
             disabled={loading}
-            className="grid h-9 w-9 place-items-center rounded-md border border-line bg-panel-soft text-slate-400 hover:text-white disabled:opacity-50"
+            className="grid h-9 w-9 place-items-center rounded-2xl border border-white/10 bg-white/5 text-text-soft hover:text-white disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -265,18 +265,22 @@ export function IncidentsPage() {
                 key={incident.id}
                 type="button"
                 onClick={() => setSelectedIncident(incident)}
-                className={`w-full rounded-lg border p-4 text-left transition ${
-                  active ? "border-mint/50 bg-mint/10" : "border-line bg-panel-soft hover:border-line hover:bg-panel-hover"
+                className={`w-full rounded-2xl border p-4 text-left transition ${
+                  active ? "border-white/40 bg-white/10" : "border-white/10 bg-white/5 hover:border-white/10 hover:bg-white/10"
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <p className="truncate text-sm font-semibold text-white">{incident.title}</p>
-                  <span className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase ${severityClass[incident.severity] ?? severityClass.medium}`}>
+                  <span
+                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${severityClass[incident.severity] ?? severityClass.medium}`}
+                  >
                     {incident.severity}
                   </span>
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-400">
-                  <span className={`font-semibold capitalize ${statusColors[incident.status] ?? "text-slate-300"}`}>{labelFor(incident.status)}</span>
+                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-text-soft">
+                  <span className={`font-semibold capitalize ${statusColors[incident.status] ?? "text-text-soft"}`}>
+                    {labelFor(incident.status)}
+                  </span>
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {new Date(incident.createdAt).toLocaleTimeString()}
@@ -285,25 +289,44 @@ export function IncidentsPage() {
               </button>
             );
           })}
-          {incidents.length === 0 && !loading ? <EmptyState title="No active incidents" /> : null}
+          {incidents.length === 0 && !loading ? (
+            <EmptyState
+              title="No incidents yet"
+              description="Create an alert rule to automatically detect service issues. AI RCA uses logs, metrics, incidents, and deployments as evidence to suggest likely root causes."
+              action={
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="primary" onClick={() => onNavigate?.("Alert Rules")}>
+                    Create alert rule
+                  </Button>
+                  <Button size="sm" onClick={() => onNavigate?.("AI RCA")}>
+                    View RCA examples
+                  </Button>
+                </div>
+              }
+            />
+          ) : null}
         </div>
       </div>
 
-      <div className="flex h-[780px] flex-col overflow-y-auto rounded-lg border border-line bg-panel p-6 shadow-panel">
+      <div className="flex h-[780px] flex-col overflow-y-auto aegis-glass rounded-2xl p-6 shadow-panel">
         {selectedIncident ? (
           <div className="space-y-6 text-left">
-            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 pb-5">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-3">
                   <h2 className="text-xl font-bold text-white">{selectedIncident.title}</h2>
-                  <span className={`rounded-md border px-2.5 py-0.5 text-xs font-bold uppercase ${severityClass[selectedIncident.severity] ?? severityClass.medium}`}>
+                  <span
+                    className={`rounded-full border px-2.5 py-0.5 text-xs font-bold uppercase ${severityClass[selectedIncident.severity] ?? severityClass.medium}`}
+                  >
                     {selectedIncident.severity}
                   </span>
-                  <span className={`rounded-md border border-line bg-panel-soft px-2.5 py-0.5 text-xs font-semibold capitalize ${statusColors[selectedIncident.status] ?? "text-slate-300"}`}>
+                  <span
+                    className={`rounded-2xl border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs font-semibold capitalize ${statusColors[selectedIncident.status] ?? "text-text-soft"}`}
+                  >
                     {labelFor(selectedIncident.status)}
                   </span>
                 </div>
-                <p className="mt-1 truncate text-sm text-slate-400 font-mono">Incident ID: {selectedIncident.id}</p>
+                <p className="mt-1 truncate text-sm text-text-soft font-mono">Incident ID: {selectedIncident.id}</p>
               </div>
 
               <div className="flex flex-wrap items-center justify-end gap-2">
@@ -312,7 +335,7 @@ export function IncidentsPage() {
                     type="button"
                     onClick={() => runAction("acknowledge", () => acknowledgeIncident(selectedIncident.id), "Incident acknowledged")}
                     disabled={Boolean(actionLoading)}
-                    className="inline-flex h-9 items-center gap-2 rounded-md bg-amber px-3 text-xs font-bold text-slate-950 disabled:opacity-50"
+                    className="inline-flex h-9 items-center gap-2 rounded-md bg-amber px-3 text-xs font-bold text-black disabled:opacity-50"
                   >
                     <CheckCircle2 className="h-4 w-4" />
                     {actionLoading === "acknowledge" ? "Working..." : "Acknowledge"}
@@ -323,7 +346,7 @@ export function IncidentsPage() {
                     type="button"
                     onClick={() => runAction("identify", () => identifyIncident(selectedIncident.id), "Root cause marked identified")}
                     disabled={Boolean(actionLoading)}
-                    className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs font-semibold text-slate-200 disabled:opacity-50"
+                    className="inline-flex h-9 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-text-primary disabled:opacity-50"
                   >
                     <ClipboardList className="h-4 w-4" />
                     Identify
@@ -334,7 +357,7 @@ export function IncidentsPage() {
                     type="button"
                     onClick={() => runAction("monitor", () => monitorIncident(selectedIncident.id), "Incident moved to monitoring")}
                     disabled={Boolean(actionLoading)}
-                    className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs font-semibold text-slate-200 disabled:opacity-50"
+                    className="inline-flex h-9 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-text-primary disabled:opacity-50"
                   >
                     <Activity className="h-4 w-4" />
                     Monitor
@@ -345,7 +368,7 @@ export function IncidentsPage() {
                     type="button"
                     onClick={() => runAction("resolve", () => resolveIncident(selectedIncident.id), "Incident resolved")}
                     disabled={Boolean(actionLoading)}
-                    className="inline-flex h-9 items-center gap-2 rounded-md bg-mint px-3 text-xs font-bold text-slate-950 disabled:opacity-50"
+                    className="inline-flex h-9 items-center gap-2 rounded-full bg-white px-3 text-xs font-bold text-black disabled:opacity-50"
                   >
                     <ShieldCheck className="h-4 w-4" />
                     Resolve
@@ -356,7 +379,7 @@ export function IncidentsPage() {
                     type="button"
                     onClick={() => runAction("reopen", () => reopenIncident(selectedIncident.id), "Incident reopened")}
                     disabled={Boolean(actionLoading)}
-                    className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs font-semibold text-slate-200 disabled:opacity-50"
+                    className="inline-flex h-9 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-text-primary disabled:opacity-50"
                   >
                     <RotateCcw className="h-4 w-4" />
                     Reopen
@@ -367,7 +390,7 @@ export function IncidentsPage() {
                     type="button"
                     onClick={() => runAction("close", () => closeIncident(selectedIncident.id), "Incident closed")}
                     disabled={Boolean(actionLoading)}
-                    className="inline-flex h-9 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs font-semibold text-slate-200 disabled:opacity-50"
+                    className="inline-flex h-9 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-text-primary disabled:opacity-50"
                   >
                     <Lock className="h-4 w-4" />
                     Close
@@ -376,35 +399,39 @@ export function IncidentsPage() {
               </div>
             </div>
 
-            {statusMessage ? <div className="rounded-md border border-line bg-panel-soft px-3 py-2 text-sm text-slate-300">{statusMessage}</div> : null}
+            {statusMessage ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-text-soft">{statusMessage}</div>
+            ) : null}
 
             <div className="grid gap-4 md:grid-cols-4">
-              <div className="rounded-lg border border-line bg-panel-soft p-4">
-                <span className="text-xs uppercase text-slate-400">Duration</span>
+              <div className="aegis-glass rounded-2xl p-4">
+                <span className="text-xs uppercase text-text-soft">Duration</span>
                 <p className="mt-1 text-xl font-bold text-white">{formatDuration(selectedIncident)}</p>
               </div>
-              <div className="rounded-lg border border-line bg-panel-soft p-4">
-                <span className="text-xs uppercase text-slate-400">Evidence</span>
+              <div className="aegis-glass rounded-2xl p-4">
+                <span className="text-xs uppercase text-text-soft">Evidence</span>
                 <p className="mt-1 text-xl font-bold text-white">{evidence.length}</p>
               </div>
-              <div className="rounded-lg border border-line bg-panel-soft p-4">
-                <span className="text-xs uppercase text-slate-400">Timeline</span>
+              <div className="aegis-glass rounded-2xl p-4">
+                <span className="text-xs uppercase text-text-soft">Timeline</span>
                 <p className="mt-1 text-xl font-bold text-white">{timeline.length}</p>
               </div>
-              <div className="rounded-lg border border-line bg-panel-soft p-4">
-                <span className="text-xs uppercase text-slate-400">AI Confidence</span>
-                <p className="mt-1 text-xl font-bold text-white">{analysis ? `${Math.round(Number(analysis.confidenceScore ?? 0) * 100)}%` : "Pending"}</p>
+              <div className="aegis-glass rounded-2xl p-4">
+                <span className="text-xs uppercase text-text-soft">AI Confidence</span>
+                <p className="mt-1 text-xl font-bold text-white">
+                  {analysis ? `${Math.round(Number(analysis.confidenceScore ?? 0) * 100)}%` : "Pending"}
+                </p>
               </div>
             </div>
 
             <section>
-              <h3 className="mb-2 text-sm font-bold uppercase text-slate-400">Description / Summary</h3>
-              <div className="rounded-lg border border-line bg-panel-soft p-4 text-sm leading-relaxed text-slate-300">
+              <h3 className="mb-2 text-sm font-bold uppercase text-text-soft">Description / Summary</h3>
+              <div className="aegis-glass rounded-2xl p-4 text-sm leading-relaxed text-text-soft">
                 {selectedIncident.summary || "No description provided."}
               </div>
             </section>
 
-            <section className="rounded-lg border border-amber-500/20 bg-amber/10 p-5 shadow-panel">
+            <section className="rounded-2xl border border-amber-500/20 bg-amber/10 p-5 shadow-panel">
               <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-amber-500/10 pb-3">
                 <ShieldCheck className="h-5 w-5 text-amber-400" />
                 <h3 className="text-base font-bold text-amber-400">AI Root Cause Analysis</h3>
@@ -413,7 +440,7 @@ export function IncidentsPage() {
                     type="button"
                     onClick={handleRunRca}
                     disabled={Boolean(actionLoading)}
-                    className="inline-flex h-8 items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 text-xs font-semibold text-amber-200 disabled:opacity-50"
+                    className="inline-flex h-8 items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 text-xs font-semibold text-amber-200 disabled:opacity-50"
                   >
                     <BrainCircuit className="h-4 w-4" />
                     {actionLoading === "rca" ? "Running..." : "Run RCA"}
@@ -422,7 +449,7 @@ export function IncidentsPage() {
                     type="button"
                     onClick={handleGeneratePostmortem}
                     disabled={Boolean(actionLoading)}
-                    className="inline-flex h-8 items-center gap-2 rounded-md border border-line bg-panel-soft px-3 text-xs font-semibold text-slate-200 disabled:opacity-50"
+                    className="inline-flex h-8 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-text-primary disabled:opacity-50"
                   >
                     <FileText className="h-4 w-4" />
                     {actionLoading === "postmortem" ? "Generating..." : "Postmortem"}
@@ -431,21 +458,21 @@ export function IncidentsPage() {
               </div>
 
               {loadingIncidentDetails ? (
-                <div className="py-6 text-center text-sm text-slate-400">Loading AI analysis...</div>
+                <div className="py-6 text-center text-sm text-text-soft">Loading AI analysis...</div>
               ) : analysis ? (
-                <div className="space-y-4 text-sm text-slate-300">
+                <div className="space-y-4 text-sm text-text-soft">
                   <div>
-                    <h4 className="mb-1 text-xs font-bold uppercase text-slate-400">Executive Summary</h4>
-                    <p className="leading-relaxed text-slate-200">{analysis.summary}</p>
+                    <h4 className="mb-1 text-xs font-bold uppercase text-text-soft">Executive Summary</h4>
+                    <p className="leading-relaxed text-text-primary">{analysis.summary}</p>
                   </div>
                   <div>
-                    <h4 className="mb-1 text-xs font-bold uppercase text-slate-400">Likely Root Cause</h4>
+                    <h4 className="mb-1 text-xs font-bold uppercase text-text-soft">Likely Root Cause</h4>
                     <p className="font-medium leading-relaxed text-amber-200/90">{analysis.likelyRootCause}</p>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <h4 className="mb-1.5 text-xs font-bold uppercase text-slate-400">Evidence Identified</h4>
-                      <ul className="list-disc space-y-1 pl-4 text-xs text-slate-300">
+                      <h4 className="mb-1.5 text-xs font-bold uppercase text-text-soft">Evidence Identified</h4>
+                      <ul className="list-disc space-y-1 pl-4 text-xs text-text-soft">
                         {evidenceItems.map((item, idx) => (
                           <li key={`${item}-${idx}`}>{item}</li>
                         ))}
@@ -453,8 +480,8 @@ export function IncidentsPage() {
                       </ul>
                     </div>
                     <div>
-                      <h4 className="mb-1.5 text-xs font-bold uppercase text-slate-400">Recommended Actions</h4>
-                      <ul className="list-disc space-y-1 pl-4 text-xs text-slate-300">
+                      <h4 className="mb-1.5 text-xs font-bold uppercase text-text-soft">Recommended Actions</h4>
+                      <ul className="list-disc space-y-1 pl-4 text-xs text-text-soft">
                         {recommendedActions.map((item, idx) => (
                           <li key={`${item}-${idx}`}>{item}</li>
                         ))}
@@ -473,32 +500,32 @@ export function IncidentsPage() {
                   ) : null}
                   {analysis.postmortemDraft ? (
                     <div>
-                      <h4 className="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase text-slate-400">
-                        <BookOpen className="h-3.5 w-3.5 text-slate-400" />
+                      <h4 className="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase text-text-soft">
+                        <BookOpen className="h-3.5 w-3.5 text-text-soft" />
                         Postmortem Draft
                       </h4>
-                      <div className="max-h-52 overflow-y-auto whitespace-pre-wrap rounded border border-line bg-panel-soft p-3 font-mono text-xs leading-5 text-slate-300">
+                      <div className="max-h-52 overflow-y-auto whitespace-pre-wrap rounded border border-white/10 bg-white/5 p-3 font-mono text-xs leading-5 text-text-soft">
                         {analysis.postmortemDraft}
                       </div>
                     </div>
                   ) : null}
                 </div>
               ) : (
-                <div className="py-6 text-center text-sm text-slate-400">No AI RCA has been generated yet.</div>
+                <div className="py-6 text-center text-sm text-text-soft">No AI RCA has been generated yet.</div>
               )}
             </section>
 
             <section className="grid gap-4 xl:grid-cols-[1fr_320px]">
               <div>
                 <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <h3 className="mr-auto text-sm font-bold uppercase text-slate-400">Evidence</h3>
+                  <h3 className="mr-auto text-sm font-bold uppercase text-text-soft">Evidence</h3>
                   {evidenceTabs.map((tab) => (
                     <button
                       key={tab}
                       type="button"
                       onClick={() => setEvidenceTab(tab)}
-                      className={`h-8 rounded-md border px-3 text-xs capitalize ${
-                        evidenceTab === tab ? "border-mint bg-mint/10 text-mint" : "border-line bg-panel-soft text-slate-300"
+                      className={`h-8 rounded-full border px-3 text-xs capitalize ${
+                        evidenceTab === tab ? "border-white/40 bg-white/10 text-white" : "border-white/10 bg-white/5 text-text-soft"
                       }`}
                     >
                       {labelFor(tab)}
@@ -507,17 +534,17 @@ export function IncidentsPage() {
                 </div>
                 <div className="space-y-3">
                   {filteredEvidence.map((item) => (
-                    <div key={item.id} className="rounded-lg border border-line bg-panel-soft p-4">
+                    <div key={item.id} className="aegis-glass rounded-2xl p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="rounded-md border border-slate-600 bg-panel-hover px-2 py-0.5 text-[10px] font-bold uppercase text-slate-300">
+                          <span className="rounded-full border border-slate-600 bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase text-text-soft">
                             {labelFor(item.evidenceType)}
                           </span>
                           <p className="text-sm font-semibold text-white">{item.title ?? "Untitled evidence"}</p>
                         </div>
-                        <span className="text-xs text-slate-500">{formatDate(item.createdAt)}</span>
+                        <span className="text-xs text-text-muted">{formatDate(item.createdAt)}</span>
                       </div>
-                      <pre className="mt-3 max-h-44 overflow-auto rounded-md border border-line bg-slate-950/60 p-3 text-xs leading-5 text-slate-300">
+                      <pre className="mt-3 max-h-44 overflow-auto rounded-full border border-white/10 bg-code/60 p-3 text-xs leading-5 text-text-soft">
                         {jsonPreview(item.payload)}
                       </pre>
                     </div>
@@ -526,17 +553,17 @@ export function IncidentsPage() {
                 </div>
               </div>
 
-              <form onSubmit={handleAddEvidence} className="rounded-lg border border-line bg-panel-soft p-4">
+              <form onSubmit={handleAddEvidence} className="aegis-glass rounded-2xl p-4">
                 <div className="mb-3 flex items-center gap-2">
-                  <Plus className="h-4 w-4 text-mint" />
+                  <Plus className="h-4 w-4 text-white" />
                   <h3 className="text-sm font-semibold text-white">Add Evidence</h3>
                 </div>
-                <label className="mb-3 block text-xs font-semibold uppercase text-slate-400">
+                <label className="mb-3 block text-xs font-semibold uppercase text-text-soft">
                   Type
                   <select
                     value={evidenceForm.evidenceType}
                     onChange={(event) => setEvidenceForm((current) => ({ ...current, evidenceType: event.target.value }))}
-                    className="mt-1 h-10 w-full rounded-md border border-line bg-slate-950 px-3 text-sm normal-case text-white"
+                    className="mt-1 h-10 w-full rounded-full border border-white/10 bg-code px-3 text-sm normal-case text-white"
                   >
                     {evidenceTypeOptions.map((type) => (
                       <option key={type} value={type}>
@@ -545,27 +572,27 @@ export function IncidentsPage() {
                     ))}
                   </select>
                 </label>
-                <label className="mb-3 block text-xs font-semibold uppercase text-slate-400">
+                <label className="mb-3 block text-xs font-semibold uppercase text-text-soft">
                   Title
                   <input
                     value={evidenceForm.title}
                     onChange={(event) => setEvidenceForm((current) => ({ ...current, title: event.target.value }))}
-                    className="mt-1 h-10 w-full rounded-md border border-line bg-slate-950 px-3 text-sm normal-case text-white"
+                    className="mt-1 h-10 w-full rounded-full border border-white/10 bg-code px-3 text-sm normal-case text-white"
                     placeholder="Database timeout log"
                   />
                 </label>
-                <label className="block text-xs font-semibold uppercase text-slate-400">
+                <label className="block text-xs font-semibold uppercase text-text-soft">
                   Payload JSON
                   <textarea
                     value={evidenceForm.payload}
                     onChange={(event) => setEvidenceForm((current) => ({ ...current, payload: event.target.value }))}
-                    className="mt-1 h-40 w-full rounded-md border border-line bg-slate-950 p-3 font-mono text-xs normal-case leading-5 text-white"
+                    className="mt-1 h-40 w-full rounded-full border border-white/10 bg-code p-3 font-mono text-xs normal-case leading-5 text-white"
                   />
                 </label>
                 <button
                   type="submit"
                   disabled={actionLoading === "evidence"}
-                  className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-mint px-3 text-xs font-bold text-slate-950 disabled:opacity-50"
+                  className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-white px-3 text-xs font-bold text-black disabled:opacity-50"
                 >
                   <Plus className="h-4 w-4" />
                   {actionLoading === "evidence" ? "Adding..." : "Add Evidence"}
@@ -574,24 +601,24 @@ export function IncidentsPage() {
             </section>
 
             <section>
-              <h3 className="mb-3 text-sm font-bold uppercase text-slate-400">Incident Timeline</h3>
+              <h3 className="mb-3 text-sm font-bold uppercase text-text-soft">Incident Timeline</h3>
               {loadingIncidentDetails ? (
-                <p className="text-xs text-slate-400">Loading timeline...</p>
+                <p className="text-xs text-text-soft">Loading timeline...</p>
               ) : (
-                <div className="relative ml-2 space-y-4 border-l border-line pl-4">
+                <div className="relative ml-2 space-y-4 border-l border-white/10 pl-4">
                   {timeline.map((item, idx) => (
                     <div key={item.id || idx} className="relative">
-                      <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-shell bg-slate-600" />
+                      <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-shell bg-text-muted" />
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-2 text-xs">
-                          <span className="font-semibold capitalize text-slate-300">{labelFor(String(item.eventType ?? "event"))}</span>
-                          <span className="text-[10px] text-slate-500">{new Date(item.createdAt).toLocaleString()}</span>
+                          <span className="font-semibold capitalize text-text-soft">{labelFor(String(item.eventType ?? "event"))}</span>
+                          <span className="text-[10px] text-text-muted">{new Date(item.createdAt).toLocaleString()}</span>
                         </div>
-                        <p className="text-sm text-slate-300">{item.message}</p>
+                        <p className="text-sm text-text-soft">{item.message}</p>
                       </div>
                     </div>
                   ))}
-                  {timeline.length === 0 ? <p className="text-xs text-slate-500">No events on this timeline yet.</p> : null}
+                  {timeline.length === 0 ? <p className="text-xs text-text-muted">No events on this timeline yet.</p> : null}
                 </div>
               )}
             </section>

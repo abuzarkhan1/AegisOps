@@ -35,14 +35,14 @@ export function LogsPage({ onNavigate }: { onNavigate?: (label: string) => void 
         key: "timestamp",
         header: "Timestamp",
         sortable: true,
-        className: "whitespace-nowrap font-mono text-xs text-slate-500",
+        className: "whitespace-nowrap font-mono text-xs text-text-muted",
         render: (log) => new Date(log.timestamp).toLocaleTimeString()
       },
       {
         key: "service",
         header: "Service",
         sortable: true,
-        className: "whitespace-nowrap text-xs font-semibold text-slate-200",
+        className: "whitespace-nowrap text-xs font-semibold text-text-primary",
         render: (log) => log.serviceName || "-"
       },
       {
@@ -61,20 +61,20 @@ export function LogsPage({ onNavigate }: { onNavigate?: (label: string) => void 
       {
         key: "request",
         header: "Request",
-        className: "whitespace-nowrap font-mono text-xs text-slate-500",
+        className: "whitespace-nowrap font-mono text-xs text-text-muted",
         render: (log) => log.requestId || log.traceId || "-"
       },
       {
         key: "route",
         header: "Route",
-        className: "whitespace-nowrap font-mono text-xs text-slate-500",
+        className: "whitespace-nowrap font-mono text-xs text-text-muted",
         render: (log) => log.route || log.metadata?.route || "-"
       },
       {
         key: "status",
         header: "Status",
         sortable: true,
-        className: "whitespace-nowrap font-mono text-xs text-slate-500",
+        className: "whitespace-nowrap font-mono text-xs text-text-muted",
         render: (log) => log.statusCode || log.metadata?.statusCode || "-"
       }
     ],
@@ -123,17 +123,17 @@ export function LogsPage({ onNavigate }: { onNavigate?: (label: string) => void 
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_auto]">
-      <div className="rounded-lg border border-line bg-panel p-6 shadow-panel">
+      <div className="aegis-glass rounded-2xl p-6 shadow-panel">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-white">Logs Explorer</h2>
-            <p className="text-sm text-slate-400">Search and filter logs from application services</p>
+            <p className="text-sm text-text-soft">Search and filter logs from application services</p>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={loadLogs}
               disabled={loading}
-              className="flex h-10 items-center gap-2 rounded-md border border-line bg-panel-soft px-4 text-sm font-medium text-slate-300 hover:text-white disabled:opacity-50"
+              className="flex h-10 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-text-soft hover:text-white disabled:opacity-50"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -144,11 +144,11 @@ export function LogsPage({ onNavigate }: { onNavigate?: (label: string) => void 
         {/* Filters Panel */}
         <div className="mb-6 grid gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-10">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-400">Organization</label>
+            <label className="text-xs font-semibold text-text-soft">Organization</label>
             <select
               value={organizationFilter}
               onChange={(e) => setOrganizationFilter(e.target.value)}
-              className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 outline-none"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary outline-none"
             >
               <option value="">All orgs</option>
               {organizations.map((org) => (
@@ -160,11 +160,11 @@ export function LogsPage({ onNavigate }: { onNavigate?: (label: string) => void 
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-400">Project</label>
+            <label className="text-xs font-semibold text-text-soft">Project</label>
             <select
               value={projectFilter}
               onChange={(e) => setProjectFilter(e.target.value)}
-              className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 outline-none"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary outline-none"
             >
               <option value="">All projects</option>
               {projects.map((project) => (
@@ -176,11 +176,11 @@ export function LogsPage({ onNavigate }: { onNavigate?: (label: string) => void 
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-400">Service</label>
+            <label className="text-xs font-semibold text-text-soft">Service</label>
             <select
               value={serviceFilter}
               onChange={(e) => setServiceFilter(e.target.value)}
-              className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 outline-none"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary outline-none"
             >
               <option value="">All Services</option>
               {services.map((svc) => (
@@ -192,11 +192,11 @@ export function LogsPage({ onNavigate }: { onNavigate?: (label: string) => void 
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-400">Level</label>
+            <label className="text-xs font-semibold text-text-soft">Level</label>
             <select
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
-              className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 outline-none"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary outline-none"
             >
               <option value="">All Levels</option>
               <option value="debug">debug</option>
@@ -208,11 +208,11 @@ export function LogsPage({ onNavigate }: { onNavigate?: (label: string) => void 
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-400">Environment</label>
+            <label className="text-xs font-semibold text-text-soft">Environment</label>
             <select
               value={envFilter}
               onChange={(e) => setEnvFilter(e.target.value)}
-              className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 outline-none"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary outline-none"
             >
               <option value="">All Envs</option>
               <option value="dev">dev</option>
@@ -222,79 +222,79 @@ export function LogsPage({ onNavigate }: { onNavigate?: (label: string) => void 
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-400">Trace ID</label>
+            <label className="text-xs font-semibold text-text-soft">Trace ID</label>
             <input
               type="text"
               placeholder="e.g. req_abc"
               value={traceFilter}
               onChange={(e) => setTraceFilter(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && loadLogs()}
-              className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 outline-none placeholder:text-slate-500"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary outline-none placeholder:text-text-muted"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-400">Request ID</label>
+            <label className="text-xs font-semibold text-text-soft">Request ID</label>
             <input
               type="text"
               placeholder="req_abc"
               value={requestFilter}
               onChange={(e) => setRequestFilter(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && loadLogs()}
-              className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 outline-none placeholder:text-slate-500"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary outline-none placeholder:text-text-muted"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-400">Route</label>
+            <label className="text-xs font-semibold text-text-soft">Route</label>
             <input
               type="text"
               placeholder="/api/checkout"
               value={routeFilter}
               onChange={(e) => setRouteFilter(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && loadLogs()}
-              className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 outline-none placeholder:text-slate-500"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary outline-none placeholder:text-text-muted"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-400">Status</label>
+            <label className="text-xs font-semibold text-text-soft">Status</label>
             <input
               type="number"
               placeholder="500"
               value={statusCodeFilter}
               onChange={(e) => setStatusCodeFilter(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && loadLogs()}
-              className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 outline-none placeholder:text-slate-500"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary outline-none placeholder:text-text-muted"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-400">From</label>
+            <label className="text-xs font-semibold text-text-soft">From</label>
             <input
               type="datetime-local"
               value={fromFilter}
               onChange={(e) => setFromFilter(e.target.value)}
-              className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 outline-none"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary outline-none"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-400">To</label>
+            <label className="text-xs font-semibold text-text-soft">To</label>
             <input
               type="datetime-local"
               value={toFilter}
               onChange={(e) => setToFilter(e.target.value)}
-              className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 outline-none"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary outline-none"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-slate-400">Limit</label>
+            <label className="text-xs font-semibold text-text-soft">Limit</label>
             <select
               value={limit}
               onChange={(e) => setLimit(Number(e.target.value))}
-              className="h-10 rounded-md border border-line bg-panel-soft px-3 text-sm text-slate-200 outline-none"
+              className="h-10 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-text-primary outline-none"
             >
               <option value={50}>50 rows</option>
               <option value={100}>100 rows</option>
@@ -307,19 +307,19 @@ export function LogsPage({ onNavigate }: { onNavigate?: (label: string) => void 
         {/* Text Search */}
         <div className="mb-6 flex gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-text-soft" />
             <input
               type="text"
               placeholder="Search in log message..."
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && loadLogs()}
-              className="h-10 w-full rounded-md border border-line bg-panel-soft pl-10 pr-3 text-sm text-slate-200 outline-none placeholder:text-slate-500"
+              className="h-10 w-full rounded-2xl border border-white/10 bg-white/5 pl-10 pr-3 text-sm text-text-primary outline-none placeholder:text-text-muted"
             />
           </div>
           <button
             onClick={loadLogs}
-            className="flex h-10 items-center justify-center rounded-md bg-mint px-5 text-sm font-semibold text-slate-950 transition hover:bg-opacity-90"
+            className="flex h-10 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-black transition hover:bg-opacity-90"
           >
             Search
           </button>
@@ -329,12 +329,17 @@ export function LogsPage({ onNavigate }: { onNavigate?: (label: string) => void 
           rows={logs}
           columns={columns}
           loading={loading}
-          emptyTitle="No logs found"
-          emptyDescription="Connect a service or adjust the active filters to inspect request logs, trace IDs, routes, and structured metadata."
+          emptyTitle="No logs received yet"
+          emptyDescription="Install an SDK or send a test log to start searching your application logs. Trace ID links logs and metrics from the same request or operation."
           emptyAction={
-            <Button variant="primary" size="sm" onClick={() => onNavigate?.("Connect Project")}>
-              Connect Project
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="primary" size="sm" onClick={() => onNavigate?.("Connect Project")}>
+                View integration guide
+              </Button>
+              <Button size="sm" onClick={() => onNavigate?.("Connect Project")}>
+                Send test log
+              </Button>
+            </div>
           }
           onRowClick={setSelectedLog}
           getRowLabel={(log) => `Open log details for ${log.serviceName || "service"} ${log.requestId || log.traceId || ""}`.trim()}

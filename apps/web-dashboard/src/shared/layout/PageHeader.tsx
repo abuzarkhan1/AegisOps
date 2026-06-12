@@ -17,7 +17,7 @@ export function PageHeader({
       <div className="min-w-0">
         {eyebrow ? <Breadcrumbs items={["AegisOps", eyebrow]} /> : null}
         <h1 className="mt-1 truncate text-2xl font-bold leading-8 text-white">{title}</h1>
-        {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">{description}</p> : null}
+        {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-text-soft">{description}</p> : null}
       </div>
       {actions}
     </header>

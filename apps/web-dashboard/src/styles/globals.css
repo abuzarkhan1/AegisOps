@@ -76,8 +76,9 @@ pre,
 
 .x-card {
   border: 1px solid var(--x-border);
-  background: var(--x-surface);
-  border-radius: 8px;
+  background: rgba(31, 31, 31, 0.36);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
 }
 
 .x-control {
@@ -85,7 +86,10 @@ pre,
   background: var(--x-surface-2);
   border-radius: 999px;
   color: var(--x-text);
-  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .x-control:focus,
@@ -93,4 +97,59 @@ pre,
   border-color: var(--x-blue);
   box-shadow: 0 0 0 3px var(--x-blue-soft);
   outline: none;
+}
+
+.aegis-glass {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(31, 31, 31, 0.36);
+  backdrop-filter: blur(14px);
+}
+
+.aegis-pill {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(2px);
+}
+
+.animate-overlay-fade {
+  animation: overlay-fade var(--transition-overlay);
+}
+
+.animate-modal-in {
+  animation: modal-in var(--transition-overlay);
+}
+
+.animate-drawer-in {
+  animation: drawer-in var(--transition-overlay);
+}
+
+@keyframes overlay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }

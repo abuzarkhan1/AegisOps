@@ -61,7 +61,7 @@ function normalizeSession(session: AuthSessionRecord | StoredSession): StoredSes
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<StoredSession | undefined>(() => readStoredSession());
-  const [status, setStatus] = useState<AuthStatus>(() => readStoredSession() ? "loading" : "anonymous");
+  const [status, setStatus] = useState<AuthStatus>(() => (readStoredSession() ? "loading" : "anonymous"));
   const sessionRef = useRef<StoredSession | undefined>(session);
 
   const applySession = useCallback((nextSession?: StoredSession) => {
@@ -121,25 +121,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [applySession]);
 
-  const value = useMemo<AuthContextValue>(() => ({
-    status,
-    user: session?.user,
-    accessToken: session?.accessToken,
-    refreshToken: session?.refreshToken,
-    login: async (payload) => {
-      const next = await loginRequest(payload);
-      applySession(normalizeSession(next));
-    },
-    register: async (payload) => {
-      const next = await registerRequest(payload);
-      applySession(normalizeSession(next));
-    },
-    logout: async () => {
-      const token = sessionRef.current?.refreshToken;
-      applySession(undefined);
-      await logoutRequest(token).catch(() => undefined);
-    }
-  }), [applySession, session?.accessToken, session?.refreshToken, session?.user, status]);
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      status,
+      user: session?.user,
+      accessToken: session?.accessToken,
+      refreshToken: session?.refreshToken,
+      login: async (payload) => {
+        const next = await loginRequest(payload);
+        applySession(normalizeSession(next));
+      },
+      register: async (payload) => {
+        const next = await registerRequest(payload);
+        applySession(normalizeSession(next));
+      },
+      logout: async () => {
+        const token = sessionRef.current?.refreshToken;
+        applySession(undefined);
+        await logoutRequest(token).catch(() => undefined);
+      }
+    }),
+    [applySession, session?.accessToken, session?.refreshToken, session?.user, status]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

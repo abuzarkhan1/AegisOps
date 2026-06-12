@@ -1,4 +1,4 @@
-import { Copy } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { IconButton } from "./IconButton";
 
@@ -13,7 +13,7 @@ export function CopyButton({ value, label = "Copy" }: { value: string; label?: s
 
   return (
     <IconButton label={copied ? "Copied" : label} onClick={copy}>
-      <Copy className="h-4 w-4" />
+      {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
     </IconButton>
   );
 }

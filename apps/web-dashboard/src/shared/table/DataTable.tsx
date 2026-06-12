@@ -48,19 +48,19 @@ export function DataTable<T extends { id?: string }>({
   return (
     <div className="overflow-x-auto rounded-lg border border-line">
       <table className="w-full text-left text-sm">
-        <thead className="sticky top-0 border-b border-line bg-panel text-xs uppercase text-slate-500">
+        <thead className="sticky top-0 border-b border-line bg-panel text-xs uppercase text-text-muted">
           <tr>
             {columns.map((column) => (
               <th key={column.key} className={cn("whitespace-nowrap px-4 py-3 font-semibold", column.headerClassName)}>
                 <span className="inline-flex items-center gap-1.5">
                   {column.header}
-                  {column.sortable ? <ArrowUpDown className="h-3 w-3 text-slate-600" aria-hidden="true" /> : null}
+                  {column.sortable ? <ArrowUpDown className="h-3 w-3 text-text-muted" aria-hidden="true" /> : null}
                 </span>
               </th>
             ))}
             {actions ? (
               <th className="w-10 px-4 py-3 text-right font-semibold">
-                <MoreHorizontal className="ml-auto h-4 w-4 text-slate-600" aria-hidden="true" />
+                <MoreHorizontal className="ml-auto h-4 w-4 text-text-muted" aria-hidden="true" />
               </th>
             ) : null}
           </tr>
@@ -69,13 +69,20 @@ export function DataTable<T extends { id?: string }>({
           {rows.map((row, index) => (
             <tr
               key={row.id ?? index}
-              className={cn("transition hover:bg-panel-hover", onRowClick && "cursor-pointer focus-visible:bg-panel-hover focus-visible:outline-none")}
+              className={cn(
+                "transition hover:bg-panel-hover",
+                onRowClick && "cursor-pointer focus-visible:bg-panel-hover focus-visible:outline-none"
+              )}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               onKeyDown={(event) => handleRowKeyDown(event, row)}
               tabIndex={onRowClick ? 0 : undefined}
-              aria-label={onRowClick ? getRowLabel?.(row) ?? "Open row details" : undefined}
+              aria-label={onRowClick ? (getRowLabel?.(row) ?? "Open row details") : undefined}
             >
-              {columns.map((column) => <td key={column.key} className={cn("px-4 py-3 text-slate-300", column.className)}>{column.render(row)}</td>)}
+              {columns.map((column) => (
+                <td key={column.key} className={cn("px-4 py-3 text-text-soft", column.className)}>
+                  {column.render(row)}
+                </td>
+              ))}
               {actions ? <td className="px-4 py-3 text-right">{actions(row)}</td> : null}
             </tr>
           ))}
@@ -93,7 +100,7 @@ export function SearchInput({ className, ...props }: InputHTMLAttributes<HTMLInp
   return (
     <input
       className={cn(
-        "h-10 min-w-64 rounded-full border border-line bg-panel-soft px-4 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-mint focus:ring-2 focus:ring-mint/20",
+        "h-10 min-w-64 rounded-full border border-line bg-panel-soft px-4 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-white/30 focus:ring-2 focus:ring-white/10",
         className
       )}
       type="search"

@@ -38,56 +38,41 @@ export type NavigationGroup = {
 
 export const navigationGroups: NavigationGroup[] = [
   {
-    label: "Command Center",
+    label: "Start",
     items: [
-      { label: "Overview", icon: LayoutDashboard },
-      { label: "Connect Project", icon: Cable, path: "/connect-project" }
+      { label: "Overview", icon: LayoutDashboard, path: "/overview" },
+      { label: "Connect Project", icon: Cable, path: "/connect-project" },
+      { label: "Projects", icon: FolderKanban }
     ]
   },
   {
-    label: "Monitoring",
+    label: "Monitor",
     items: [
-      { label: "Projects", icon: FolderKanban },
-      { label: "Services", icon: ListTree },
-      { label: "Service Catalog", icon: LayoutPanelTop },
       { label: "Logs", icon: TerminalSquare },
       { label: "Metrics", icon: Gauge },
-      { label: "Dashboards", icon: BarChart3 }
-    ]
-  },
-  {
-    label: "Reliability",
-    items: [
-      { label: "Issues", icon: ShieldAlert },
       { label: "Incidents", icon: Siren },
       { label: "Alert Rules", icon: ActivitySquare },
-      { label: "SLOs", icon: Waves },
-      { label: "Synthetics", icon: Radar }
-    ]
-  },
-  {
-    label: "AI",
-    items: [
       { label: "AI RCA", icon: BrainCircuit },
-      { label: "AI Investigations", icon: SearchCode }
+      { label: "Settings", icon: Settings }
     ]
   },
   {
-    label: "Delivery",
+    label: "Advanced",
     items: [
-      { label: "Deployments", icon: GitBranch },
-      { label: "Releases", icon: Rocket }
-    ]
-  },
-  {
-    label: "Organization",
-    items: [
+      { label: "Services", icon: ListTree },
+      { label: "Service Catalog", icon: LayoutPanelTop },
       { label: "API Keys", icon: KeyRound },
+      { label: "Dashboards", icon: BarChart3 },
+      { label: "Issues", icon: ShieldAlert },
+      { label: "SLOs", icon: Waves },
+      { label: "Synthetics", icon: Radar },
+      { label: "Deployments", icon: GitBranch },
+      { label: "Releases", icon: Rocket },
+      { label: "AI Investigations", icon: SearchCode },
       { label: "Notifications", icon: BellRing },
       { label: "Reports", icon: BarChart3 },
       { label: "Team", icon: UsersRound },
-      { label: "Audit Logs", icon: ScrollText },
-      { label: "Settings", icon: Settings }
+      { label: "Audit Logs", icon: ScrollText }
     ]
   }
 ];
@@ -97,6 +82,10 @@ export const navigationItems: NavigationItem[] = navigationGroups.flatMap((group
 );
 
 export const navPath = (label: string, path?: string) =>
-  path ?? (label === "Overview" ? "/" : `/${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`);
+  path ??
+  `/${label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")}`;
 
 export const navByPath = Object.fromEntries(navigationItems.map((item) => [navPath(item.label, item.path), item.label]));
